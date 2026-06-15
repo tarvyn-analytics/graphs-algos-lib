@@ -87,6 +87,29 @@ it is an actual odd hole in your input graph.
 > which is exact on the graph families it was built for (cliques, paths, cycles,
 > cographs, correlation-network graphs).
 
+## Storing / exporting the result
+
+The result is a plain object — keep it, or serialize it with the built-in,
+zero-dependency exporters in `…comparability.export`:
+
+```java
+import ch.tarvynanalytics.graphs.comparability.export.JsonExporter;
+import ch.tarvynanalytics.graphs.comparability.export.DotExporter;
+
+String json = JsonExporter.toJson(result);                 // full result as JSON
+String dot  = DotExporter.inputGraphToDot(result);         // input graph as Graphviz DOT
+String lvl  = DotExporter.factorLevelToDot(result.levels().get(0));
+
+result.failure().ifPresent(f ->
+    System.out.println(DotExporter.failureCycleToDot(f)));  // odd cycle, weakest edge in red
+```
+
+Render DOT with Graphviz, e.g. `dot -Tsvg graph.dot -o graph.svg`. The JSON
+mirrors the model: `comparability`, `transitiveOrientationCount` (a bare
+arbitrary-precision integer), `inputGraph`, `levels[]` (each with `graph`,
+`modules`, `factorGraph`) and `failure` (`null`, or the cycle with its
+`weakestCorrelation` / `weakestEdge`; a non-finite correlation is `null`).
+
 ## Package layout
 
 ```
@@ -98,6 +121,7 @@ ch.tarvynanalytics.graphs.comparability
   .model                  – immutable result types (records):
                             AnalysisResult, GraphView, NodeView, EdgeView,
                             FactorGraphLevelView, ModuleView, ModuleType, FailureCycle
+  .export                 – JsonExporter, DotExporter (zero-dependency serializers)
   .exception              – ComparabilityException, InvalidInputException
 ```
 
