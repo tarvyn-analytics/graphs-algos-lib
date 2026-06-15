@@ -9,11 +9,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigInteger;
+import java.time.Duration;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ComparabilityAnalyzerTest {
@@ -157,6 +159,40 @@ class ComparabilityAnalyzerTest {
         assertTrue(r.levels().size() >= 2, "the cograph decomposes over multiple levels");
         assertEquals(2, r.levels().get(0).modules().size());
         assertTrue(r.levels().get(0).modules().stream().allMatch(m -> m.type() == ModuleType.CLIQUE));
+    }
+
+    // ---- totality: the engine must always terminate with a verdict ------
+
+    @Test
+    void threeSun_Terminates_WithoutStackOverflow() {
+        // The 3-sun (Hajós graph): triangle 0-1-2 plus an outer vertex on each
+        // pair of triangle edges. It used to overflow the stack: the chain-cover
+        // "apendix" grew without bound (the periodic walk 0 2 4 2 0 3 ...) because
+        // it never reached an attachment point. The engine must now terminate and
+        // return a self-consistent verdict on this (and every) input.
+        boolean[][] a = new boolean[6][6];
+        link(a, 0, 1);
+        link(a, 1, 2);
+        link(a, 0, 2);
+        link(a, 3, 0);
+        link(a, 3, 1);
+        link(a, 4, 1);
+        link(a, 4, 2);
+        link(a, 5, 0);
+        link(a, 5, 2);
+
+        // must not hang or StackOverflow — a verdict has to come back promptly
+        AnalysisResult r = assertTimeoutPreemptively(Duration.ofSeconds(10), () -> analyze(a));
+
+        // self-consistency: comparability <=> a non-zero orientation count <=> no failure cycle.
+        assertEquals(r.isComparability(), r.transitiveOrientationCount().signum() > 0);
+        assertEquals(r.isComparability(), r.failure().isEmpty());
+
+        // NOTE (correctness, not totality): a brute-force oracle gives the 3-sun
+        // ZERO transitive orientations, so it is NOT a comparability graph, yet
+        // the thesis algorithm currently accepts it (comparability=true). That
+        // false positive is a soundness/completeness gap tracked under CGD-5 (D5);
+        // this test only pins down that the engine is now total.
     }
 
     @Test
