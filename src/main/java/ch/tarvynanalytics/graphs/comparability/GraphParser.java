@@ -522,25 +522,37 @@ final class GraphParser {
         int n = last().initGraph.nodes.size();
         long maxApendix = (long) n * n + 2L;
         while (apendix.size() <= maxApendix) {
-            Node apendixLast = apendix.get(apendix.size() - 1);
-            Node apendixPreLast = apendix.get(apendix.size() - 2);
-            for (int i = fullChain.size() - 1; i > -1; i--) {
-                if (fullChain.get(i) == apendixLast) {
-                    if (i == fullChain.size() - 1) {
-                        return i;
-                    }
-                    if (!fullChain.get(i + 1).adjacentNodes.contains(apendixPreLast)) {
-                        if (i + 1 == fullChain.size() - 1) {
-                            return i;
-                        }
-                        if (!fullChain.get(i + 2).adjacentNodes.contains(apendixLast)) {
-                            return i;
-                        }
-                    }
-                }
+            int positionToAppend = apendixAttachmentPosition(fullChain, apendix);
+            if (positionToAppend > -1) {
+                return positionToAppend;
             }
             if (increaseApendix(apendix) < 0) {
                 return -1;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Finds the position in {@code fullChain} where the current {@code apendix}
+     * can re-attach without creating a triangulation, or {@code -1} if none.
+     */
+    private int apendixAttachmentPosition(List<Node> fullChain, List<Node> apendix) {
+        Node apendixLast = apendix.get(apendix.size() - 1);
+        Node apendixPreLast = apendix.get(apendix.size() - 2);
+        int lastIdx = fullChain.size() - 1;
+        for (int i = lastIdx; i > -1; i--) {
+            if (fullChain.get(i) != apendixLast) {
+                continue;
+            }
+            if (i == lastIdx) {
+                return i;
+            }
+            if (fullChain.get(i + 1).adjacentNodes.contains(apendixPreLast)) {
+                continue;
+            }
+            if (i + 1 == lastIdx || !fullChain.get(i + 2).adjacentNodes.contains(apendixLast)) {
+                return i;
             }
         }
         return -1;
