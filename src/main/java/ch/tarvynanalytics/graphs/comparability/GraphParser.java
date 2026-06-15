@@ -507,27 +507,55 @@ final class GraphParser {
         if (fullChain == null || apendix == null) {
             return -1;
         }
-        Node apendixLast = apendix.get(apendix.size() - 1);
-        Node apendixPreLast = apendix.get(apendix.size() - 2);
-        for (int i = fullChain.size() - 1; i > -1; i--) {
-            if (fullChain.get(i) == apendixLast) {
-                if (i == fullChain.size() - 1) {
-                    return i;
-                }
-                if (!fullChain.get(i + 1).adjacentNodes.contains(apendixPreLast)) {
-                    if (i + 1 == fullChain.size() - 1) {
-                        return i;
-                    }
-                    if (!fullChain.get(i + 2).adjacentNodes.contains(apendixLast)) {
-                        return i;
-                    }
-                }
+        // Totality safeguard (deviation from the C# prototype, which recursed
+        // unboundedly here). The apendix is a non-triangulable walk in the
+        // current factor-graph level; its growth is driven only by the tail pair
+        // (apendixPreLast, apendixLast), of which there are at most n*(n-1)
+        // distinct values. On a non-comparability input such as the 3-sun the
+        // walk becomes periodic (e.g. 0 2 4 2 0 3 repeated) and never reaches an
+        // attachment point, so the original recursion overflows the stack. A
+        // legitimate apendix is tiny (<= the longest induced path) — far below
+        // this cap — so capping the length and returning "no attachment point"
+        // (which the caller already handles by orienting the dangling edge
+        // directly) cannot change the verdict on any input that terminates
+        // naturally, and makes the engine total on every input.
+        int n = last().initGraph.nodes.size();
+        long maxApendix = (long) n * n + 2L;
+        while (apendix.size() <= maxApendix) {
+            int positionToAppend = apendixAttachmentPosition(fullChain, apendix);
+            if (positionToAppend > -1) {
+                return positionToAppend;
+            }
+            if (increaseApendix(apendix) < 0) {
+                return -1;
             }
         }
-        if (increaseApendix(apendix) < 0) {
-            return -1;
+        return -1;
+    }
+
+    /**
+     * Finds the position in {@code fullChain} where the current {@code apendix}
+     * can re-attach without creating a triangulation, or {@code -1} if none.
+     */
+    private int apendixAttachmentPosition(List<Node> fullChain, List<Node> apendix) {
+        Node apendixLast = apendix.get(apendix.size() - 1);
+        Node apendixPreLast = apendix.get(apendix.size() - 2);
+        int lastIdx = fullChain.size() - 1;
+        for (int i = lastIdx; i > -1; i--) {
+            if (fullChain.get(i) != apendixLast) {
+                continue;
+            }
+            if (i == lastIdx) {
+                return i;
+            }
+            if (fullChain.get(i + 1).adjacentNodes.contains(apendixPreLast)) {
+                continue;
+            }
+            if (i + 1 == lastIdx || !fullChain.get(i + 2).adjacentNodes.contains(apendixLast)) {
+                return i;
+            }
         }
-        return createNonTriangApendix(fullChain, apendix);
+        return -1;
     }
 
     private int increaseApendix(List<Node> apendix) {
