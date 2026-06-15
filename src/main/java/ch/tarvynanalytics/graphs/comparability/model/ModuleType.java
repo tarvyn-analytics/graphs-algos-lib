@@ -24,10 +24,9 @@ public enum ModuleType {
     CLIQUE,
 
     /**
-     * A minimal module that is neither a clique nor an independent set —
-     * captured through a non-triangulable (chordless) chain. These are the
-     * modules whose orientation feasibility is tested for the obstructing
-     * odd cycle.
+     * A module that is neither a clique nor an independent set — its induced
+     * subgraph has both edges and non-edges (a prime or otherwise non-degenerate
+     * module of the modular decomposition).
      */
     MIN_STABLE
 }

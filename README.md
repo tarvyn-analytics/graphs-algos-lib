@@ -70,22 +70,27 @@ level is the *factor graph* of the previous one — every maximal stable set
 | `MIN_STABLE`      | minimal module captured by a chordless chain (neither of the above)|
 | `SINGLETON`       | a module of one vertex                                             |
 
-The number of distinct transitive orientations is the product over all levels of
-`2^(#MIN_STABLE modules) × Π factorial(clique size)` — exactly the thesis
-formula, computed as a `BigInteger` so it never overflows.
+The number of distinct transitive orientations is computed from the canonical
+**modular decomposition** tree — the product over its nodes of `k!` for a series
+(join) node with `k` children, `1` for a parallel (union) node and `2` for a
+prime node — the standard Gallai/Golumbic count, held as a `BigInteger` so it
+never overflows.
 
 When the graph is **not** a comparability graph, `failure()` returns the
-`FailureCycle`: the odd-length chordless cycle that obstructs any transitive
-orientation, lifted back to original vertices (one representative per module), so
-it is an actual odd hole in your input graph.
+`FailureCycle`: an odd-length closed **forcing walk** that obstructs any
+transitive orientation, in original vertices. When the obstruction is an odd hole
+(e.g. C₅, C₇) it is exactly that hole; for a folded obstruction (e.g. the 3-sun)
+it is a closed walk that may revisit vertices — every consecutive pair is a real
+edge either way.
 
-> **Scope of the test.** This is the thesis algorithm: it certifies
-> non-comparability through the **odd-hole obstruction** uncovered while building
-> minimal modules, and certifies comparability constructively via the
-> decomposition. It is not a from-scratch reimplementation of the full Gallai
-> characterization; it reproduces the thesis prototype's behaviour faithfully,
-> which is exact on the graph families it was built for (cliques, paths, cycles,
-> cographs, correlation-network graphs).
+> **Scope of the test.** The verdict and obstruction are decided by **Golumbic's
+> forcing relation (Γ)** — the standard, *sound and complete* comparability test
+> (a graph is a comparability graph iff no implication class contains an edge and
+> its reverse). The orientation count comes from the canonical modular
+> decomposition. Correctness is cross-checked against a brute-force oracle over
+> every graph up to 5 vertices. (Earlier releases ported a thesis prototype that
+> was found to be unsound, incomplete and to under-count; see
+> `docs/theory-review.md`.)
 
 ## Storing / exporting the result
 
@@ -116,8 +121,9 @@ arbitrary-precision integer), `inputGraph`, `levels[]` (each with `graph`,
 ch.tarvynanalytics.graphs.comparability
   ComparabilityAnalyzer   – entry point: analyze(GraphInput) -> AnalysisResult
   GraphInput              – build the graph from a correlation or adjacency matrix
-  (package-private)       – Node, Graph, FactorGraphLevel, GraphParser, ResultBuilder:
-                            the analysis engine; implementations are not exported
+  (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
+                            ModularDecomposition (count + factor-graph levels),
+                            ResultBuilder: the engine; not exported
   .model                  – immutable result types (records):
                             AnalysisResult, GraphView, NodeView, EdgeView,
                             FactorGraphLevelView, ModuleView, ModuleType, FailureCycle

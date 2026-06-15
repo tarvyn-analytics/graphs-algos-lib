@@ -52,9 +52,6 @@ public final class ComparabilityAnalyzer {
         if (input == null) {
             throw new IllegalArgumentException("input must not be null");
         }
-        Graph graph = Graph.fromInput(input);
-        GraphParser parser = new GraphParser(graph);
-        parser.parseGraph();
-        return ResultBuilder.build(input, parser);
+        return ResultBuilder.build(input);
     }
 }

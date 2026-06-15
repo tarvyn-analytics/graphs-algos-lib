@@ -24,16 +24,22 @@ library — there is no application to run; the tests are the executable spec.
 
 1. **Zero runtime dependencies.** Test scope (JUnit) is the only exception. Do
    not add a JSON library, Guava, commons-*, anything — hand-roll it.
-2. **Faithful to the thesis algorithm.** The engine (`GraphParser`, `Graph`,
-   `Node`, `FactorGraphLevel`) is a deliberate port of the C# prototype
-   (`## Anexa` of the thesis). Keep the decomposition order
-   (not-linked → full → minimal), the chordless-chain machinery and the
-   odd-cycle test behaviourally identical. When in doubt, match the original;
-   do not "improve" the graph theory. Engine nodes are compared by **reference
-   identity** (no `equals` override) — list membership relies on it.
+2. **Correct, standard algorithms — not the thesis port.** The original C#
+   chain-folding engine was found to be unsound *and* incomplete and to
+   under-count orientations (see `docs/theory-review.md`, CGD-5); it has been
+   replaced. The verdict + obstruction come from **Golumbic's forcing relation
+   (Γ)** in `ForcingRelation` (sound & complete: a graph is a comparability graph
+   iff no implication class contains an arc and its reverse). The orientation
+   count and the factor-graph levels come from the **canonical modular
+   decomposition** in `ModularDecomposition` (count = ∏ over the tree: `k!` for a
+   series node, `1` for parallel, `2` for prime). Correctness is pinned by an
+   exhaustive brute-force-oracle test (`OracleCharacterizationTest`, all labeled
+   graphs n ≤ 5, verdict + count). Do not regress to the thesis heuristic; prove
+   any engine change against the oracle.
 3. **The public result is immutable.** Everything in `model/` is a `record` with
-   defensive `List.copyOf` in its compact constructor. The engine is mutable and
-   package-private; never leak engine `Node`/`Graph` objects across the API.
+   defensive `List.copyOf` in its compact constructor. The engine works on a
+   plain `boolean[][]` adjacency built from `GraphInput`; never leak internal
+   working state across the API.
 4. **Implementations are package-private.** Only `ComparabilityAnalyzer`,
    `GraphInput`, the `model` records and the exceptions are public. Keep it that
    way.
@@ -59,17 +65,18 @@ library — there is no application to run; the tests are the executable spec.
 
 ## Task guides
 
-### Touch the decomposition engine (`GraphParser` & friends)
+### Touch the engine (`ForcingRelation` / `ModularDecomposition`)
 
-The known-graph tests in `ComparabilityAnalyzerTest` are the safety net — they
-must keep passing. The trickiest part is the minimal-module chain extension
-(`getNonTriangChain` → `continueNonTriangChain` → `createNonTriangApendix` /
-`increaseApendix` / `reverseAppendNonTriangs`): it grows a chordless chain to
-cover every edge of a minimal module, and the result feeds `canCreateOddCycle`.
-The orientation bookkeeping (`nodesTo`/`nodesFrom`/`nodesNotOriented`) is scratch
-state that drives which edges still need covering; it is reset before the
-odd-cycle test and no concrete direction is ever exposed. If you change it,
-re-verify against the odd-cycle fixtures and add the new case to the suite.
+`OracleCharacterizationTest` (exhaustive over all labeled graphs n ≤ 5, verdict
+*and* count vs a brute-force oracle) plus the known-graph tests in
+`ComparabilityAnalyzerTest` are the safety net — they must keep passing.
+`ForcingRelation` decides comparability via Γ implication classes and, on
+failure, returns a shortest odd forcing walk (a clean odd hole when one exists,
+otherwise a closed walk that may revisit vertices — see `arcsToCycle`).
+`ModularDecomposition` recurses parallel (disconnected) / series (co-disconnected)
+/ prime (maximal strong modules, found via minimal-module closure) and supplies
+both the count and the level/grouping view. Any change must still match the
+oracle; add new graph families to the oracle test.
 
 ### Add a result field
 
