@@ -274,49 +274,51 @@ final class ModularDecomposition {
         Set<Integer> unclassified = new LinkedHashSet<>(verts);
         while (!unclassified.isEmpty()) {
             int x = unclassified.iterator().next();
-            List<Integer> block = new ArrayList<>();
+            Set<Integer> block = new LinkedHashSet<>();
             block.add(x);
             for (int y : verts) {
-                if (y != x && unclassified.contains(y)
-                        && minimalModule(verts, x, y).size() < verts.size()) {
-                    block.add(y);
+                if (y != x && unclassified.contains(y) && !block.contains(y)) {
+                    Set<Integer> mm = minimalModule(verts, x, y);
+                    if (mm.size() < verts.size()) {
+                        block.addAll(mm); // the whole proper module shares x's class
+                    }
                 }
             }
             unclassified.removeAll(block);
-            blocks.add(block);
+            blocks.add(new ArrayList<>(block));
         }
         return blocks;
     }
 
-    /** Smallest module of the induced subgraph on {@code verts} containing {@code x} and {@code y}. */
+    /**
+     * Smallest module of the induced subgraph on {@code verts} containing {@code x}
+     * and {@code y}, grown by absorbing every vertex that distinguishes the set.
+     * {@code adjCount[w]} tracks how many current members {@code w} is adjacent to,
+     * updated incrementally so each membership test is O(1) (overall O(n²)).
+     */
     private Set<Integer> minimalModule(List<Integer> verts, int x, int y) {
         Set<Integer> m = new HashSet<>();
         m.add(x);
         m.add(y);
+        int[] adjCount = new int[n];
+        for (int w : verts) {
+            adjCount[w] = (adj[w][x] ? 1 : 0) + (adj[w][y] ? 1 : 0);
+        }
         boolean changed = true;
         while (changed) {
             changed = false;
-            for (int z : verts) {
-                if (!m.contains(z) && distinguishes(z, m)) {
-                    m.add(z); // a module cannot be split, so it must absorb z
+            for (int w : verts) {
+                if (!m.contains(w) && adjCount[w] > 0 && adjCount[w] < m.size()) {
+                    m.add(w); // w is adjacent to some but not all of m, so a module must absorb it
+                    for (int u : verts) {
+                        if (adj[u][w]) {
+                            adjCount[u]++;
+                        }
+                    }
                     changed = true;
                 }
             }
         }
         return m;
-    }
-
-    /** Whether {@code z} is adjacent to some but not all of {@code m} (so it splits it). */
-    private boolean distinguishes(int z, Set<Integer> m) {
-        boolean adjSome = false;
-        boolean adjAll = true;
-        for (int u : m) {
-            if (adj[z][u]) {
-                adjSome = true;
-            } else {
-                adjAll = false;
-            }
-        }
-        return adjSome && !adjAll;
     }
 }
