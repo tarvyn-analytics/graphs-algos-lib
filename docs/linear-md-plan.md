@@ -14,10 +14,18 @@ Progress against §5 (update this section whenever a step lands):
   `ModularDecomposition` builds one cached decomposition tree (`MDNode` +
   `buildTree()`); `orientationCount()` folds it and `levels()` takes its level-0
   partition from it (`rootBlocks`). Behaviour unchanged; oracle + full suite green.
-- [ ] **Step 2 — `buildTreeLinear()`**, ported from the `fracture` algorithm in
-  `jonasspinner/modular-decomposition` (see §3).  ← **next**
-- [ ] **Step 3 — differential test** (lands with step 2).
-- [ ] **Step 4 — size gate.**
+- [x] **Step 2 — `buildTreeLinear()`**, ported from the `fracture` algorithm in
+  `jonasspinner/modular-decomposition` (§3). Done, PR #16. A Java port of the readable
+  `crates/fracture/src/base.rs`: factorizing permutation by partition refinement →
+  parenthesizing → dummy-node pruning → parallel/series/prime read-off into `MDNode`.
+  Wired as an alternative path (`useLinearBuilder()`); the simple recursion stays the
+  default (the gate is step 4). No runtime dependency added.
+- [x] **Step 3 — differential test.** Done, PR #16.
+  `ModularDecompositionLinearDifferentialTest` pins the linear builder against the
+  simple recursion over ~10.8k random graphs (n = 6..14) + named families, comparing the
+  canonical order-invariant tree signature (subsumes count + level-0 partition) and the
+  orientation count.
+- [ ] **Step 4 — size gate.**  ← **next**
 - [ ] **Step 5 — benchmark + docs.**
 
 Each step is one small PR off `develop`, oracle-guarded. To keep a session's
@@ -94,17 +102,18 @@ Each step lists the files a fresh session needs — read only those plus this pl
    `MDNode` + `buildTree()` in `ModularDecomposition`; `orientationCount()` folds the
    tree and `levels()` uses `rootBlocks(tree())` for level 0. The tree is the single
    swappable function; no algorithm change; oracle + suite unchanged.
-2. **Add `buildTreeLinear()`** — ported from the `fracture` algorithm in
-   `jonasspinner/modular-decomposition` (§3), producing the same `MDNode` shape
-   (`Kind` LEAF/PARALLEL/SERIES/PRIME). Add it as an alternative path; keep the simple
-   recursion the default (no gate yet — that's step 4) so the suite is unaffected
-   until step 3 trusts it.
-   *Context:* `ModularDecomposition.java` (the `tree()` / `buildTree()` / `rootPartition`
-   region), §3–§4 and §6–§7 here, §9 references, and the two repos in §3.
-3. **Differential test** (§6) — gate-free, asserts `buildTreeLinear` yields the same
-   orientation count *and* the same levels as the simple recursion over ~10k random
-   graphs n=6…14 plus the named families. Land it with step 2.
-   *Context:* `OracleCharacterizationTest.java` (oracle/builder patterns), §6.
+2. ✅ **Add `buildTreeLinear()`** — done (PR #16). Java port of the `fracture` algorithm
+   from `jonasspinner/modular-decomposition` (the readable `crates/fracture/src/base.rs`),
+   producing the same `MDNode` shape (`Kind` LEAF/PARALLEL/SERIES/PRIME). Wired as an
+   alternative path via `useLinearBuilder()`; the simple recursion stays the default (no
+   gate yet — that's step 4). No runtime dependency added.
+3. ✅ **Differential test** — done (PR #16). `ModularDecompositionLinearDifferentialTest`
+   asserts `buildTreeLinear` yields the same canonical decomposition tree (an
+   order-invariant `treeSignature()` — node kinds + sorted child signatures) *and* the
+   same orientation count as the simple recursion over ~10.8k random graphs n=6…14 plus
+   the named families. The tree signature is the right invariant: it subsumes the count
+   and the level-0 partition, but a node's child *display order* is not canonical, so the
+   order-dependent deeper levels are not directly comparable across builders (§7).
 4. **Size gate** — `buildTree()` dispatches on n (simple `< THRESHOLD ≤` linear).
    *Context:* `ModularDecomposition.buildTree`, `Benchmark.java`.
 5. **Benchmark + docs** — pick `THRESHOLD` with `Benchmark`, update
