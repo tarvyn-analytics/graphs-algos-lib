@@ -6,6 +6,23 @@ keep the simpler low-constant code. Read `docs/performance.md` (the measured
 hotspot) and `CLAUDE.md` invariant #2 (correctness over the brute-force oracle)
 first.
 
+## 0. Status — start here
+
+Progress against §5 (update this section whenever a step lands):
+
+- [x] **Step 1 — tree refactor.** Done, PR #11 (squash `5c26dc8`).
+  `ModularDecomposition` builds one cached decomposition tree (`MDNode` +
+  `buildTree()`); `orientationCount()` folds it and `levels()` takes its level-0
+  partition from it (`rootBlocks`). Behaviour unchanged; oracle + full suite green.
+- [ ] **Step 2 — `buildTreeLinear()`** (the linear MD builder).  ← **next**
+- [ ] **Step 3 — differential test** (lands with step 2).
+- [ ] **Step 4 — size gate.**
+- [ ] **Step 5 — benchmark + docs.**
+
+Each step is one small PR off `develop`, oracle-guarded. To keep a session's
+context small, read only **this plan + the files named under the step in §5** —
+not the whole codebase. `ForcingRelation` (the Γ verdict) is never touched.
+
 ## 1. Why / scope
 
 `ModularDecomposition` decides, for each (sub)graph, whether it is **parallel**
@@ -43,8 +60,9 @@ paper cold.
 
 ## 4. Recommended design — build an explicit tree once
 
-Today `orientationCount()` and `levels()` each recurse through `rootPartition`
-independently (so comparability graphs decompose twice). Unify first:
+**Done in step 1.** `orientationCount()` and `levels()` used to recurse through
+`rootPartition` independently (so comparability graphs decomposed twice); they now
+share one cached tree. The shape that landed:
 
 ```
 MDNode { Type type (PARALLEL|SERIES|PRIME|LEAF); List<MDNode> children; int[] vertices }
@@ -58,18 +76,27 @@ makes the algorithm a single swappable function `buildTree()`.
 
 ## 5. Steps (each independently mergeable, all oracle-guarded)
 
-1. **Refactor to a tree (behaviour-preserving).** Introduce `MDNode`; implement
-   `buildTree()` using the *current* parallel/series/prime recursion; make
-   `orientationCount()` and `levels()` consume the tree. `OracleCharacterizationTest`
-   and all existing tests must pass unchanged. No new algorithm yet — this just
-   decouples "compute the tree" from "use the tree."
+Each step lists the files a fresh session needs — read only those plus this plan.
+
+1. ✅ **Refactor to a tree (behaviour-preserving).** Done (PR #11, `5c26dc8`).
+   `MDNode` + `buildTree()` in `ModularDecomposition`; `orientationCount()` folds the
+   tree and `levels()` uses `rootBlocks(tree())` for level 0. The tree is the single
+   swappable function; no algorithm change; oracle + suite unchanged.
 2. **Add `buildTreeLinear()`** — the Tedder et al. builder, producing the same
-   `MDNode` shape.
-3. **Differential test** (§6) — gate-free, compares the two builders. Land it with
-   step 2.
-4. **Size gate** — `buildTree()` dispatches on n to simple vs linear.
-5. **Benchmark + docs** — pick `THRESHOLD`, update `docs/performance.md` with new
-   before/after numbers; note the gate constant.
+   `MDNode` shape (`Kind` LEAF/PARALLEL/SERIES/PRIME). Add it as an alternative path;
+   keep the simple recursion the default (no gate yet — that's step 4) so the suite is
+   unaffected until step 3 trusts it.
+   *Context:* `ModularDecomposition.java` (the `tree()` / `buildTree()` / `rootPartition`
+   region), §3–§4 and §6–§7 here, §9 references.
+3. **Differential test** (§6) — gate-free, asserts `buildTreeLinear` yields the same
+   orientation count *and* the same levels as the simple recursion over ~10k random
+   graphs n=6…14 plus the named families. Land it with step 2.
+   *Context:* `OracleCharacterizationTest.java` (oracle/builder patterns), §6.
+4. **Size gate** — `buildTree()` dispatches on n (simple `< THRESHOLD ≤` linear).
+   *Context:* `ModularDecomposition.buildTree`, `Benchmark.java`.
+5. **Benchmark + docs** — pick `THRESHOLD` with `Benchmark`, update
+   `docs/performance.md` (new before/after numbers, the gate constant) and §0 status.
+   *Context:* `Benchmark.java`, `docs/performance.md`.
 
 ## 6. Safety net (the key to trusting a tricky MD)
 
