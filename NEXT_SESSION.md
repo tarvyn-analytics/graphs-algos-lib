@@ -6,6 +6,45 @@ codebase as it stands at commit on `develop` after CGD-1..4.
 
 ---
 
+## ⚠️ Status update — CGD-10..13 (read this first; much below is now historical)
+
+The correctness phase is **done** and the engine has been **replaced**. Sections
+0–5 below described the *old* thesis-ported engine and its bugs; they are kept
+for history but no longer reflect the code.
+
+- **CGD-10 (P0)** — the 3-sun `StackOverflow` was fixed (engine made total).
+  *Superseded by the rewrite, but it unblocked the sweep.*
+- **CGD-5 / CGD-11 (D5)** — `docs/theory-review.md`. Verdict: the thesis
+  *criterion* (Thm 2.22) is correct (it is Golumbic's forcing relation), but
+  **Algorithm 2.3.1 was unsound, incomplete and under-counted**. Evidence from a
+  brute-force oracle sweep.
+- **CGD-6 / CGD-12 (D4 + the fix)** — the engine was **rewritten**. The old
+  `GraphParser`/`Graph`/`Node`/`FactorGraphLevel` are **deleted**. Now:
+  `ForcingRelation` (Golumbic Γ verdict + odd forcing-walk obstruction —
+  sound & complete) and `ModularDecomposition` (canonical modular decomposition
+  → exact orientation count + factor-graph levels). `OracleCharacterizationTest`
+  pins verdict **and** count against brute force for every labeled graph n ≤ 5,
+  named families, and the n = 6 graphs the old engine got wrong.
+- **CLAUDE.md invariant #2** ("faithful to the thesis algorithm") is **retired**;
+  the new rule is "correct, standard algorithms, proven against the oracle."
+
+### Remaining epics, re-scoped to the new engine
+
+- **D1 / CGD-7 — code quality.** Largely *subsumed* by the CGD-12 rewrite (already
+  int-indexed, separated concerns, intent-revealing names). Only residual polish
+  remains.
+- **D3 / CGD-8 — performance.** The old hotspots are gone. The new hotspot is
+  `ModularDecomposition.maximalModularPartition` → `minimalModule` (a closure
+  that is ~O(n⁴) across the recursion); fine for DJIA-scale (~30), the lever for
+  S&P-scale (~500). `ForcingRelation` is ~O(m·n). Add a benchmark harness, then
+  optimise the modular decomposition (e.g. a near-linear MD algorithm or
+  memoised closures) — guard with the oracle test.
+- **D2 / CGD-9 — parallelism.** Unchanged in spirit: batch-level (threshold
+  sweeps, rolling windows, Monte-Carlo) over independent `analyze` calls; the
+  engine is stateless per call. Intra-analysis parallelism is still low-value.
+
+---
+
 ## 0. Current state (what exists)
 
 - **Repo**: `tarvyn-analytics/graphs-comparability-lib` (private), default branch
