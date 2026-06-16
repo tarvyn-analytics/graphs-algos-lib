@@ -12,7 +12,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Canonical modular (substitution) decomposition of the input graph. It supplies
@@ -241,7 +244,7 @@ final class ModularDecomposition {
     /** Connected components of the induced subgraph (or its complement when {@code complement}). */
     private List<List<Integer>> components(List<Integer> verts, boolean complement) {
         List<List<Integer>> comps = new ArrayList<>();
-        java.util.Set<Integer> seen = new java.util.HashSet<>();
+        Set<Integer> seen = new HashSet<>();
         for (int start : verts) {
             if (seen.contains(start)) {
                 continue;
@@ -268,7 +271,7 @@ final class ModularDecomposition {
     /** Children of a prime node: classes of "the minimal module containing the pair is proper". */
     private List<List<Integer>> maximalModularPartition(List<Integer> verts) {
         List<List<Integer>> blocks = new ArrayList<>();
-        java.util.Set<Integer> unclassified = new java.util.LinkedHashSet<>(verts);
+        Set<Integer> unclassified = new LinkedHashSet<>(verts);
         while (!unclassified.isEmpty()) {
             int x = unclassified.iterator().next();
             List<Integer> block = new ArrayList<>();
@@ -286,8 +289,8 @@ final class ModularDecomposition {
     }
 
     /** Smallest module of the induced subgraph on {@code verts} containing {@code x} and {@code y}. */
-    private java.util.Set<Integer> minimalModule(List<Integer> verts, int x, int y) {
-        java.util.Set<Integer> m = new java.util.HashSet<>();
+    private Set<Integer> minimalModule(List<Integer> verts, int x, int y) {
+        Set<Integer> m = new HashSet<>();
         m.add(x);
         m.add(y);
         boolean changed = true;
@@ -304,7 +307,7 @@ final class ModularDecomposition {
     }
 
     /** Whether {@code z} is adjacent to some but not all of {@code m} (so it splits it). */
-    private boolean distinguishes(int z, java.util.Set<Integer> m) {
+    private boolean distinguishes(int z, Set<Integer> m) {
         boolean adjSome = false;
         boolean adjAll = true;
         for (int u : m) {

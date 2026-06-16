@@ -3,6 +3,7 @@ package ch.tarvynanalytics.graphs.comparability;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 
@@ -112,7 +113,7 @@ final class ForcingRelation {
         for (int cur = tgt; cur != -1; cur = parent[cur]) {
             arcs.add(new int[]{cur / n, cur % n});
         }
-        java.util.Collections.reverse(arcs);
+        Collections.reverse(arcs);
         return arcsToCycle(arcs);
     }
 
