@@ -115,11 +115,34 @@ arbitrary-precision integer), `inputGraph`, `levels[]` (each with `graph`,
 `modules`, `factorGraph`) and `failure` (`null`, or the cycle with its
 `weakestCorrelation` / `weakestEdge`; a non-finite correlation is `null`).
 
+## Batch analysis (threshold sweeps, parallel)
+
+A single analysis is fast and its engine is sequential, so the worthwhile
+parallelism is at the **batch** level — and `analyze` is stateless and
+thread-safe. `BatchAnalyzer` runs many independent analyses, optionally in
+parallel over the common `ForkJoinPool`:
+
+```java
+import ch.tarvynanalytics.graphs.comparability.BatchAnalyzer;
+
+// the thesis workflow: analyse one correlation matrix across rising thresholds
+double[] thresholds = {0.3, 0.4, 0.5, 0.6, 0.7};
+List<AnalysisResult> sweep = BatchAnalyzer.thresholdSweepParallel(correlation, thresholds);
+
+// or fan out arbitrary independent inputs (rolling windows, Monte-Carlo, …)
+List<AnalysisResult> results = BatchAnalyzer.analyzeAllParallel(inputs);
+```
+
+Parallelism is explicit (the `*Parallel` methods) and falls back to sequential
+for small batches; results keep input order and the returned list is
+unmodifiable.
+
 ## Package layout
 
 ```
 ch.tarvynanalytics.graphs.comparability
   ComparabilityAnalyzer   – entry point: analyze(GraphInput) -> AnalysisResult
+  BatchAnalyzer           – run many analyses / threshold sweeps, optionally parallel
   GraphInput              – build the graph from a correlation or adjacency matrix
   (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
                             ModularDecomposition (count + factor-graph levels),
