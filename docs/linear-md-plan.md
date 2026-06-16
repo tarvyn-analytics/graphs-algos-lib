@@ -30,7 +30,9 @@ Progress against §5 (update this section whenever a step lands):
   `fracture` builder at or above it (`usesLinearBuilder()`; `useSimpleBuilder()` /
   `useLinearBuilder()` force either side for tests). Pure performance switch — the two
   builders are proven equivalent. `ModularDecompositionSizeGateTest` pins the flip.
-- [ ] **Step 5 — benchmark + docs.**  ← **next**
+- [x] **Step 5 — benchmark + docs.** Done, PR #18. `Benchmark` gained a simple-vs-linear
+  builder sweep; `docs/performance.md` records the before/after numbers (n=150 dense from
+  ~2 s to ~5 ms, 439×) and the gate constant. **All steps complete — CGD-16 done.**
 
 Each step is one small PR off `develop`, oracle-guarded. To keep a session's
 context small, read only **this plan + the files named under the step in §5** —
@@ -121,9 +123,9 @@ Each step lists the files a fresh session needs — read only those plus this pl
 4. ✅ **Size gate** — done (PR #17). `ModularDecomposition` dispatches on n: simple
    `< LINEAR_THRESHOLD (= 50) ≤` linear. `ModularDecompositionSizeGateTest` pins the flip
    and the auto path's correctness around/above the threshold.
-5. **Benchmark + docs** — pick `THRESHOLD` with `Benchmark`, update
-   `docs/performance.md` (new before/after numbers, the gate constant) and §0 status.
-   *Context:* `Benchmark.java`, `docs/performance.md`.
+5. ✅ **Benchmark + docs** — done (PR #18). `Benchmark.builderComparison()` sweeps simple
+   vs linear on dense graphs; `LINEAR_THRESHOLD = 50` was chosen from the crossover;
+   `docs/performance.md` records the before/after numbers and the gate constant.
 
 ## 6. Safety net (the key to trusting a tricky MD)
 

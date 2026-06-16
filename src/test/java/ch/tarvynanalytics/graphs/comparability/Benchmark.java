@@ -33,6 +33,50 @@ public final class Benchmark {
         for (int n : new int[]{60, 100}) {
             breakdown(n);
         }
+
+        System.out.println("== modular-decomposition builders: simple vs near-linear (fracture) ==");
+        builderComparison();
+    }
+
+    /**
+     * Times the two modular-decomposition builders against each other on dense (p=0.5,
+     * mostly prime — the simple builder's O(n^4) worst case) random graphs. This is the
+     * sweep behind the size gate ({@link ModularDecomposition#LINEAR_THRESHOLD}).
+     */
+    private static void builderComparison() {
+        System.out.printf("  (gate flips to linear at n=%d)%n", ModularDecomposition.LINEAR_THRESHOLD);
+        System.out.printf("  %-6s %12s %12s %10s%n", "n", "simple(ms)", "linear(ms)", "speedup");
+        for (int n : new int[]{20, 40, 50, 60, 80, 100, 150, 200}) {
+            double simple = timeBuilder(n, false);
+            double linear = timeBuilder(n, true);
+            System.out.printf("  %-6d %12.2f %12.2f %9.1fx%n", n, simple, linear, simple / linear);
+        }
+    }
+
+    /** Best-of timing of one modular-decomposition builder (forced) on dense graphs of size {@code n}. */
+    private static double timeBuilder(int n, boolean linear) {
+        int reps = n >= 150 ? 5 : 20;
+        for (int i = 0; i < 3; i++) {
+            buildTree(randomAdjacency(n, 0.5), linear);
+        }
+        long best = Long.MAX_VALUE;
+        for (int i = 0; i < reps; i++) {
+            boolean[][] a = randomAdjacency(n, 0.5);
+            long t0 = System.nanoTime();
+            buildTree(a, linear);
+            best = Math.min(best, System.nanoTime() - t0);
+        }
+        return best / 1e6;
+    }
+
+    private static void buildTree(boolean[][] a, boolean linear) {
+        ModularDecomposition md = new ModularDecomposition(a);
+        if (linear) {
+            md.useLinearBuilder();
+        } else {
+            md.useSimpleBuilder();
+        }
+        md.orientationCount();
     }
 
     /** Splits analyze() time into the Γ verdict vs the modular-decomposition levels. */
