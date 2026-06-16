@@ -54,3 +54,17 @@ The maximal-modular-partition is still **O(n⁴)** on a *fully prime* graph
 threshold down to sparse, structured graphs), so it is left as-is. The fix, if
 ever needed, is a near-linear modular-decomposition algorithm (partition
 refinement); guard any such change with `OracleCharacterizationTest`.
+
+## Parallelism (CGD-9 / D2)
+
+**Intra-analysis parallelism is not pursued** — the decision, with evidence:
+
+- A single analysis is already fast at the target sizes (≈30 ms at n=60 above),
+  and the engine is inherently sequential and stateful (the Γ implication-class
+  BFS and the recursive modular decomposition), so splitting one analysis would
+  add coordination overhead for little gain.
+- The worthwhile parallelism is **batch-level**: threshold sweeps, rolling time
+  windows and Monte-Carlo / bootstrap runs are independent `analyze` calls.
+  `analyze` is stateless and thread-safe, so `BatchAnalyzer.*Parallel` simply
+  fans them over the common `ForkJoinPool` (gated to stay sequential below
+  `MIN_PARALLEL_BATCH` to avoid fork/join overhead on tiny batches).
