@@ -62,31 +62,66 @@ final class ModularDecomposition {
 
     private MDNode rootTree;
 
-    /** When set, {@link #tree()} uses {@link #buildTreeLinear()} instead of the simple recursion. */
-    private boolean useLinear;
+    /** Which builder {@link #tree()} uses: gate on size (default) or a forced choice (tests). */
+    private enum Builder { AUTO, SIMPLE, LINEAR }
+
+    private Builder builder = Builder.AUTO;
 
     /**
-     * Switches this instance to the near-linear {@code fracture} builder
-     * ({@link #buildTreeLinear()}). Package-private and intended for the differential
-     * test that pins the linear builder against the simple recursion; the production
-     * path keeps the simple recursion until the size gate (step 4) selects per graph.
+     * Graph size (vertex count) at or above which the default ({@code AUTO}) path uses the
+     * near-linear {@code fracture} builder ({@link #buildTreeLinear()}); below it the
+     * low-constant simple recursion ({@link #buildTree}) is faster. The two builders are
+     * proven equivalent (ModularDecompositionLinearDifferentialTest), so this is a pure
+     * performance switch. Chosen empirically with the {@code Benchmark} harness (CGD-16).
+     */
+    static final int LINEAR_THRESHOLD = 50;
+
+    /**
+     * Forces the near-linear {@code fracture} builder regardless of size. Package-private,
+     * for the differential test that pins it against the simple recursion.
      *
      * @return {@code this}, for chaining
      */
     ModularDecomposition useLinearBuilder() {
-        this.useLinear = true;
+        this.builder = Builder.LINEAR;
         return this;
+    }
+
+    /**
+     * Forces the simple recursion regardless of size. Package-private, so tests can pin the
+     * linear builder against the simple one above {@link #LINEAR_THRESHOLD} as well.
+     *
+     * @return {@code this}, for chaining
+     */
+    ModularDecomposition useSimpleBuilder() {
+        this.builder = Builder.SIMPLE;
+        return this;
+    }
+
+    /**
+     * Whether {@link #tree()} uses the near-linear builder for this graph: the size gate when
+     * the builder is {@code AUTO}, otherwise the forced choice. Package-private for the gate test.
+     *
+     * @return {@code true} iff the near-linear builder will be used
+     */
+    boolean usesLinearBuilder() {
+        return switch (builder) {
+            case LINEAR -> true;
+            case SIMPLE -> false;
+            case AUTO -> n >= LINEAR_THRESHOLD;
+        };
     }
 
     /**
      * The decomposition tree of the whole graph, computed lazily and cached so the
      * orientation count and the factor-graph levels share a single decomposition
-     * (a comparability graph would otherwise be decomposed twice). {@code buildTree}
-     * is the one swappable place a near-linear algorithm replaces.
+     * (a comparability graph would otherwise be decomposed twice). The builder is the one
+     * swappable place: the simple recursion for small graphs, the near-linear {@code fracture}
+     * port for large ones (gated by {@link #LINEAR_THRESHOLD}).
      */
     private MDNode tree() {
         if (rootTree == null) {
-            if (useLinear) {
+            if (usesLinearBuilder()) {
                 rootTree = buildTreeLinear();
             } else {
                 List<Integer> all = new ArrayList<>();

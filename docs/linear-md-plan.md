@@ -25,8 +25,12 @@ Progress against §5 (update this section whenever a step lands):
   simple recursion over ~10.8k random graphs (n = 6..14) + named families, comparing the
   canonical order-invariant tree signature (subsumes count + level-0 partition) and the
   orientation count.
-- [ ] **Step 4 — size gate.**  ← **next**
-- [ ] **Step 5 — benchmark + docs.**
+- [x] **Step 4 — size gate.** Done, PR #17. `ModularDecomposition` picks the builder by
+  size: simple recursion below `LINEAR_THRESHOLD` (= 50 vertices), the near-linear
+  `fracture` builder at or above it (`usesLinearBuilder()`; `useSimpleBuilder()` /
+  `useLinearBuilder()` force either side for tests). Pure performance switch — the two
+  builders are proven equivalent. `ModularDecompositionSizeGateTest` pins the flip.
+- [ ] **Step 5 — benchmark + docs.**  ← **next**
 
 Each step is one small PR off `develop`, oracle-guarded. To keep a session's
 context small, read only **this plan + the files named under the step in §5** —
@@ -114,8 +118,9 @@ Each step lists the files a fresh session needs — read only those plus this pl
    the named families. The tree signature is the right invariant: it subsumes the count
    and the level-0 partition, but a node's child *display order* is not canonical, so the
    order-dependent deeper levels are not directly comparable across builders (§7).
-4. **Size gate** — `buildTree()` dispatches on n (simple `< THRESHOLD ≤` linear).
-   *Context:* `ModularDecomposition.buildTree`, `Benchmark.java`.
+4. ✅ **Size gate** — done (PR #17). `ModularDecomposition` dispatches on n: simple
+   `< LINEAR_THRESHOLD (= 50) ≤` linear. `ModularDecompositionSizeGateTest` pins the flip
+   and the auto path's correctness around/above the threshold.
 5. **Benchmark + docs** — pick `THRESHOLD` with `Benchmark`, update
    `docs/performance.md` (new before/after numbers, the gate constant) and §0 status.
    *Context:* `Benchmark.java`, `docs/performance.md`.
