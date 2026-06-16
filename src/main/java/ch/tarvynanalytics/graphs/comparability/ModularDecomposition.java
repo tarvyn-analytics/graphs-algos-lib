@@ -48,6 +48,54 @@ final class ModularDecomposition {
     }
 
     // ------------------------------------------------------------------
+    // Decomposition tree (built once, consumed by both outputs)
+    // ------------------------------------------------------------------
+
+    /** Type of a {@link MDNode}: an internal parallel/series/prime node or a single-vertex leaf. */
+    private enum Kind { LEAF, PARALLEL, SERIES, PRIME }
+
+    /** A node of the modular decomposition tree. */
+    private record MDNode(Kind kind, List<Integer> vertices, List<MDNode> children) {
+    }
+
+    private MDNode rootTree;
+
+    /**
+     * The decomposition tree of the whole graph, computed lazily and cached so the
+     * orientation count and the factor-graph levels share a single decomposition
+     * (a comparability graph would otherwise be decomposed twice). {@code buildTree}
+     * is the one swappable place a near-linear algorithm would replace.
+     */
+    private MDNode tree() {
+        if (rootTree == null) {
+            List<Integer> all = new ArrayList<>();
+            for (int i = 0; i < n; i++) {
+                all.add(i);
+            }
+            rootTree = buildTree(all);
+        }
+        return rootTree;
+    }
+
+    /** Recursively decomposes {@code verts} into the parallel/series/prime tree (leaf at size &le; 1). */
+    private MDNode buildTree(List<Integer> verts) {
+        if (verts.size() <= 1) {
+            return new MDNode(Kind.LEAF, verts, List.of());
+        }
+        Partition p = rootPartition(verts);
+        List<MDNode> children = new ArrayList<>();
+        for (List<Integer> block : p.blocks()) {
+            children.add(buildTree(block));
+        }
+        Kind kind = switch (p.type()) {
+            case PARALLEL -> Kind.PARALLEL;
+            case SERIES -> Kind.SERIES;
+            case PRIME -> Kind.PRIME;
+        };
+        return new MDNode(kind, verts, children);
+    }
+
+    // ------------------------------------------------------------------
     // Orientation count
     // ------------------------------------------------------------------
 
@@ -56,25 +104,18 @@ final class ModularDecomposition {
         if (n == 0) {
             return BigInteger.ONE;
         }
-        List<Integer> all = new ArrayList<>();
-        for (int i = 0; i < n; i++) {
-            all.add(i);
-        }
-        return count(all);
+        return count(tree());
     }
 
-    private BigInteger count(List<Integer> verts) {
-        if (verts.size() <= 1) {
-            return BigInteger.ONE;
-        }
-        Partition p = rootPartition(verts);
+    /** Folds the tree: a series node contributes {@code k!}, a prime node {@code 2}, parallel/leaf {@code 1}. */
+    private BigInteger count(MDNode node) {
         BigInteger prod = BigInteger.ONE;
-        for (List<Integer> block : p.blocks()) {
-            prod = prod.multiply(count(block));
+        for (MDNode child : node.children()) {
+            prod = prod.multiply(count(child));
         }
-        return switch (p.type()) {
-            case PARALLEL -> prod;
-            case SERIES -> factorial(p.blocks().size()).multiply(prod);
+        return switch (node.kind()) {
+            case LEAF, PARALLEL -> prod;
+            case SERIES -> factorial(node.children().size()).multiply(prod);
             case PRIME -> BigInteger.TWO.multiply(prod);
         };
     }
@@ -105,7 +146,9 @@ final class ModularDecomposition {
         int level = 0;
         while (true) {
             GraphView curGraph = graphView(curAdj, curN, leaves, input);
-            List<List<Integer>> blocks = levelBlocks(curAdj, curN);
+            // Level 0 is the original graph: reuse the shared tree's root (the expensive
+            // decomposition) instead of recomputing it. Deeper levels are cheap quotient graphs.
+            List<List<Integer>> blocks = level == 0 ? rootBlocks(tree()) : levelBlocks(curAdj, curN);
             List<ModuleView> modules = new ArrayList<>();
             for (int b = 0; b < blocks.size(); b++) {
                 modules.add(new ModuleView(b, classify(curAdj, blocks.get(b)), blocks.get(b)));
@@ -142,6 +185,29 @@ final class ModularDecomposition {
             return List.of(verts);
         }
         return p.blocks();
+    }
+
+    /**
+     * Level-0 blocks taken from the shared decomposition tree's root, applying the same
+     * degenerate-flattening rule as {@link #levelBlocks}: a complete (series) or empty
+     * (parallel) graph is shown as a single module.
+     */
+    private List<List<Integer>> rootBlocks(MDNode root) {
+        if (root.kind() == Kind.LEAF) {
+            return List.of(root.vertices());
+        }
+        List<List<Integer>> blocks = new ArrayList<>();
+        boolean allSingletons = true;
+        for (MDNode child : root.children()) {
+            blocks.add(child.vertices());
+            if (child.vertices().size() != 1) {
+                allSingletons = false;
+            }
+        }
+        if (allSingletons && (root.kind() == Kind.SERIES || root.kind() == Kind.PARALLEL)) {
+            return List.of(root.vertices());
+        }
+        return blocks;
     }
 
     private ModuleType classify(boolean[][] a, List<Integer> block) {
