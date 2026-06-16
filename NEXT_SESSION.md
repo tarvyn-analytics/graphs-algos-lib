@@ -6,11 +6,13 @@ codebase as it stands at commit on `develop` after CGD-1..4.
 
 ---
 
-## ⚠️ Status update — CGD-10..13 (read this first; much below is now historical)
+## ⚠️ Status update — CGD-10..15 DONE (read this first; much below is now historical)
 
-The correctness phase is **done** and the engine has been **replaced**. Sections
-0–5 below described the *old* thesis-ported engine and its bugs; they are kept
-for history but no longer reflect the code.
+The **entire roadmap (P0, D1–D5) is delivered and merged to `develop`** — PRs
+#3–#8. The engine has been **replaced**. Sections 0–5 below described the *old*
+thesis-ported engine and its bugs; they are kept for history but no longer
+reflect the code. The **one open item** is the DJIA reproduction (see end of this
+section).
 
 - **CGD-10 (P0)** — the 3-sun `StackOverflow` was fixed (engine made total).
   *Superseded by the rewrite, but it unblocked the sweep.*
@@ -28,20 +30,41 @@ for history but no longer reflect the code.
 - **CLAUDE.md invariant #2** ("faithful to the thesis algorithm") is **retired**;
   the new rule is "correct, standard algorithms, proven against the oracle."
 
-### Remaining epics, re-scoped to the new engine
+### Remaining epics — all DONE
 
-- **D1 / CGD-7 — code quality.** Largely *subsumed* by the CGD-12 rewrite (already
-  int-indexed, separated concerns, intent-revealing names). Only residual polish
-  remains.
-- **D3 / CGD-8 — performance.** The old hotspots are gone. The new hotspot is
-  `ModularDecomposition.maximalModularPartition` → `minimalModule` (a closure
-  that is ~O(n⁴) across the recursion); fine for DJIA-scale (~30), the lever for
-  S&P-scale (~500). `ForcingRelation` is ~O(m·n). Add a benchmark harness, then
-  optimise the modular decomposition (e.g. a near-linear MD algorithm or
-  memoised closures) — guard with the oracle test.
-- **D2 / CGD-9 — parallelism.** Unchanged in spirit: batch-level (threshold
-  sweeps, rolling windows, Monte-Carlo) over independent `analyze` calls; the
-  engine is stateless per call. Intra-analysis parallelism is still low-value.
+- **D1 / CGD-7 (PR #6) — DONE.** Mostly *subsumed* by the CGD-12 rewrite; PR #6
+  was residual polish (imports) + this roadmap refresh.
+- **D3 / CGD-8 (PR #7) — DONE.** Benchmark harness committed
+  (`Benchmark.main`), baselines + before/after in `docs/performance.md`. Hotspot
+  was the prime-case `minimalModule` closure; made incremental O(n²)/call →
+  ~2× on the realistic threshold-sweep path; cographs ~3 ms at n=150.
+  **Known non-target limitation:** a *fully prime* uniform-random dense graph
+  (p=0.5, n ≳ 100) is still **O(n⁴)** (~0.4–2 s). Not the target workload
+  (thresholded correlation nets are sparse/structured). Fix if ever needed:
+  near-linear MD (partition refinement), guarded by `OracleCharacterizationTest`.
+- **D2 / CGD-9 (PR #8) — DONE.** `BatchAnalyzer` — `analyzeAll` /
+  `thresholdSweep` (+ `*Parallel` variants over the common ForkJoinPool, gated
+  below `MIN_PARALLEL_BATCH`). Intra-analysis parallelism *not* pursued
+  (documented decision, with D3 evidence). Engine is stateless/thread-safe per call.
+
+### The one OPEN item — DJIA reproduction (D4 / CGD-6 sub-goal)
+
+Reproducing the thesis's **DJIA worked example** (Ch. III,
+`thesis_en/03_application_djia.md`, figs ~`image63/64`) is **not done**: the
+chapter has narrative + figures but **no machine-readable correlation matrix**,
+so it is *blocked on source data*. Everything else in D4 (oracle, sound/complete
+engine, correct count) is delivered. The CGD-6 epic is left open over just this.
+To finish: obtain the DJIA closing-price / correlation data, then add a
+`thresholdSweep` integration test/`docs/` note reproducing the network +
+threshold-raising iteration.
+
+### Where to find things (current code)
+
+- `ForcingRelation` — Γ verdict + odd forcing-walk obstruction (sound & complete).
+- `ModularDecomposition` — parallel/series/prime decomposition → count + levels.
+- `BatchAnalyzer` — batch/parallel API. `ResultBuilder` — assembles the result.
+- `OracleCharacterizationTest` — brute-force oracle net (verdict + count, n ≤ 5).
+- Docs: `docs/theory-review.md` (D5), `docs/performance.md` (D3).
 
 ---
 
