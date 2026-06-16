@@ -43,9 +43,12 @@ library — there is no application to run; the tests are the executable spec.
    defensive `List.copyOf` in its compact constructor. The engine works on a
    plain `boolean[][]` adjacency built from `GraphInput`; never leak internal
    working state across the API.
-4. **Implementations are package-private.** Only `ComparabilityAnalyzer`,
-   `GraphInput`, the `model` records and the exceptions are public. Keep it that
-   way.
+4. **Implementations are package-private.** Public surface is only the entry
+   points (`ComparabilityAnalyzer`, `BatchAnalyzer`, `cli.ComparabilityCli`),
+   `GraphInput`, the `model` records, the `export` serializers and the exceptions.
+   Keep it that way — e.g. the CLI's `CorrelationCsv` reader stays package-private,
+   and the engine (`ForcingRelation`, `ModularDecomposition`, `ResultBuilder`) is
+   never exported.
 5. **Validation errors throw `InvalidInputException`** with the offending values
    in brackets, e.g. `"... got [3x0]"`. Null `GraphInput` to the analyzer throws
    `IllegalArgumentException`.
@@ -94,6 +97,19 @@ Put it in `export/` as a public final class with static methods over the `model`
 records. Hand-roll the format — a JSON/DOT serializer isn't worth a dependency
 here (keep deps lean, invariant #1). Escape strings yourself. Test the exact
 output on a small known result.
+
+### Touch the CLI (`cli/`)
+
+`ComparabilityCli` is the `java -jar` entry point; the jar's `Main-Class` is set
+in the pom's `maven-jar-plugin`. Keep `main` a one-liner that delegates to the
+package-private `run(args, out, err)` (returns the exit code) so behaviour is unit
+tested without `System.exit`. CSV parsing lives in the package-private
+`CorrelationCsv` (hand-rolled, invariant #1); leave squareness/finiteness to
+`GraphInput.fromCorrelation`. Exit codes are result-only (`0` ran / `2` usage /
+`1` input-IO). Run it: `./mvnw -q package -DskipTests` then
+`java -jar target/graphs-comparability-lib-*.jar matrix.csv --threshold 0.5`. The
+console/`System.exit` Sonar rules (`S106`/`S1147`) are silenced for `**/cli/*.java`
+in the pom.
 
 ## Delivery: Jira, Git, PRs, CI
 

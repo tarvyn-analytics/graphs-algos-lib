@@ -21,12 +21,24 @@
         <sonar.organization>tarvyn-analytics</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.projectKey>tarvyn-analytics_graphs-comparability-lib</sonar.projectKey>
-        <!-- S5778 expects a single throwing call in a lambda; it does not fit JUnit
-             assertThrows where a setup call legitimately precedes the throwing one.
-             Exclude it from test sources only. -->
-        <sonar.issue.ignore.multicriteria>e1</sonar.issue.ignore.multicriteria>
+        <!-- e1: S5778 expects a single throwing call in a lambda; it does not fit
+             JUnit assertThrows where a setup call legitimately precedes the throwing
+             one. Exclude it from test sources only.
+             e2/e3: the CLI legitimately writes to the console (S106) and ends the
+             process with System.exit (S1147) — both are intrinsic to a command-line
+             entry point, so they are silenced for the cli package only.
+             e4: S6218 wants array-holding records to override equals/hashCode/toString;
+             CorrelationCsv.Parsed is a package-private, read-once carrier that is never
+             compared, hashed or printed, so the generated members are irrelevant. -->
+        <sonar.issue.ignore.multicriteria>e1,e2,e3,e4</sonar.issue.ignore.multicriteria>
         <sonar.issue.ignore.multicriteria.e1.ruleKey>java:S5778</sonar.issue.ignore.multicriteria.e1.ruleKey>
         <sonar.issue.ignore.multicriteria.e1.resourceKey>**/*Test.java</sonar.issue.ignore.multicriteria.e1.resourceKey>
+        <sonar.issue.ignore.multicriteria.e2.ruleKey>java:S106</sonar.issue.ignore.multicriteria.e2.ruleKey>
+        <sonar.issue.ignore.multicriteria.e2.resourceKey>**/cli/*.java</sonar.issue.ignore.multicriteria.e2.resourceKey>
+        <sonar.issue.ignore.multicriteria.e3.ruleKey>java:S1147</sonar.issue.ignore.multicriteria.e3.ruleKey>
+        <sonar.issue.ignore.multicriteria.e3.resourceKey>**/cli/*.java</sonar.issue.ignore.multicriteria.e3.resourceKey>
+        <sonar.issue.ignore.multicriteria.e4.ruleKey>java:S6218</sonar.issue.ignore.multicriteria.e4.ruleKey>
+        <sonar.issue.ignore.multicriteria.e4.resourceKey>**/cli/*.java</sonar.issue.ignore.multicriteria.e4.resourceKey>
     </properties>
 
     <distributionManagement>
@@ -79,6 +91,21 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.14.0</version>
+            </plugin>
+            <!-- Make the jar runnable (a small CLI over a correlation-matrix CSV).
+                 The Main-Class manifest entry is inert when the jar is used as a
+                 library dependency; no new runtime dependency is introduced. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>ch.tarvynanalytics.graphs.comparability.cli.ComparabilityCli</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

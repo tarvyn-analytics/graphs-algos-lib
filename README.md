@@ -137,6 +137,40 @@ Parallelism is explicit (the `*Parallel` methods) and falls back to sequential
 for small batches; results keep input order and the returned list is
 unmodifiable.
 
+## Command-line interface
+
+The jar is runnable — point it at a correlation-matrix CSV and it prints the
+verdict. The CSV is an optional header row of labels followed by one row of `n`
+comma-separated values per vertex (the corrcalc exports are exactly this shape):
+
+```
+AAPL,MSFT,SPY,GLD,TLT
+1.0,0.02,0.29,-0.15,0.11
+...
+```
+
+```bash
+./mvnw -q package -DskipTests
+java -jar target/graphs-comparability-lib-0.1.0-SNAPSHOT.jar matrix.csv --threshold 0.5
+```
+
+```
+file:          matrix.csv
+vertices:      5
+threshold:     0.5
+edges:         1
+comparability: YES
+transitive orientations: 2
+decomposition levels:    4
+```
+
+An edge is created for every pair with `|correlation| > |threshold|`
+(`--threshold` / `-t`, default `0.5`). `--json` emits the full `AnalysisResult`
+as JSON (the `JsonExporter` shape); `--help` shows usage. Exit codes are
+**result-only**: `0` when the analysis ran (whatever the verdict), `2` for a
+usage error, `1` for an input/IO error — read the verdict from the output, not
+the exit code.
+
 ## Package layout
 
 ```
@@ -147,6 +181,8 @@ ch.tarvynanalytics.graphs.comparability
   (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
                             ModularDecomposition (count + factor-graph levels),
                             ResultBuilder: the engine; not exported
+  .cli                    – ComparabilityCli (java -jar entry point over a CSV;
+                            package-private CorrelationCsv reader)
   .model                  – immutable result types (records):
                             AnalysisResult, GraphView, NodeView, EdgeView,
                             FactorGraphLevelView, ModuleView, ModuleType, FailureCycle
@@ -167,8 +203,9 @@ Requires JDK 21+. Uses the Maven wrapper.
 ./mvnw test -Dtest=ComparabilityAnalyzerTest
 ```
 
-This is a library — there is no application to run; the tests are the executable
-spec. The published artifact (jar + sources + javadoc) goes to GitHub Packages
+This is primarily a library and the tests are its executable spec; it also ships
+a small command-line interface (see above) for analysing a correlation-matrix CSV
+directly. The published artifact (jar + sources + javadoc) goes to GitHub Packages
 under `ch.tarvynanalytics.graphs:graphs-comparability-lib`.
 
 ## Development
