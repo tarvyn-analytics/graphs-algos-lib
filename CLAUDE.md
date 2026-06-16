@@ -22,8 +22,11 @@ library — there is no application to run; the tests are the executable spec.
 
 ## Invariants — never break these
 
-1. **Zero runtime dependencies.** Test scope (JUnit) is the only exception. Do
-   not add a JSON library, Guava, commons-*, anything — hand-roll it.
+1. **Dependencies: lean, not zero.** Runtime dependencies are allowed — add one
+   when it clearly pulls its weight, but be mindful not to overcrowd: prefer
+   hand-rolling small things (a JSON line, a format escaper) over pulling in
+   Guava/commons-* for a one-liner, and justify each new dependency by what it
+   saves. (Test scope, e.g. JUnit, is unconstrained.)
 2. **Correct, standard algorithms — not the thesis port.** The original C#
    chain-folding engine was found to be unsound *and* incomplete and to
    under-count orientations (see `docs/theory-review.md`, CGD-5); it has been
@@ -88,8 +91,9 @@ ships javadoc and the `-Ppublish` build fails on javadoc errors.
 ### Add an exporter (e.g. JSON, DOT)
 
 Put it in `export/` as a public final class with static methods over the `model`
-records. Hand-roll the format (invariant 1 — no dependencies). Escape strings
-yourself. Test the exact output on a small known result.
+records. Hand-roll the format — a JSON/DOT serializer isn't worth a dependency
+here (keep deps lean, invariant #1). Escape strings yourself. Test the exact
+output on a small known result.
 
 ## Delivery: Jira, Git, PRs, CI
 
