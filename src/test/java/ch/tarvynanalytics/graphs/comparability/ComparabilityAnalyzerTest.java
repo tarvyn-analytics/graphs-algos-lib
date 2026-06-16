@@ -161,15 +161,16 @@ class ComparabilityAnalyzerTest {
         assertTrue(r.levels().get(0).modules().stream().allMatch(m -> m.type() == ModuleType.CLIQUE));
     }
 
-    // ---- totality: the engine must always terminate with a verdict ------
+    // ---- the 3-sun: a chordal NON-comparability graph -------------------
 
     @Test
-    void threeSun_Terminates_WithoutStackOverflow() {
+    void threeSun_IsNotComparability_AndTerminates() {
         // The 3-sun (Hajós graph): triangle 0-1-2 plus an outer vertex on each
-        // pair of triangle edges. It used to overflow the stack: the chain-cover
-        // "apendix" grew without bound (the periodic walk 0 2 4 2 0 3 ...) because
-        // it never reached an attachment point. The engine must now terminate and
-        // return a self-consistent verdict on this (and every) input.
+        // pair of triangle edges. It is chordal (no odd hole) yet not a
+        // comparability graph — a brute-force oracle gives it zero transitive
+        // orientations. The thesis chain engine both overflowed the stack here
+        // and (once bounded) wrongly accepted it; the Golumbic Γ engine rejects
+        // it via an odd forcing walk.
         boolean[][] a = new boolean[6][6];
         link(a, 0, 1);
         link(a, 1, 2);
@@ -181,18 +182,17 @@ class ComparabilityAnalyzerTest {
         link(a, 5, 0);
         link(a, 5, 2);
 
-        // must not hang or StackOverflow — a verdict has to come back promptly
         AnalysisResult r = assertTimeoutPreemptively(Duration.ofSeconds(10), () -> analyze(a));
+        assertFalse(r.isComparability(), "the 3-sun is not a comparability graph");
+        assertEquals(BigInteger.ZERO, r.transitiveOrientationCount());
 
-        // self-consistency: comparability <=> a non-zero orientation count <=> no failure cycle.
-        assertEquals(r.isComparability(), r.transitiveOrientationCount().signum() > 0);
-        assertEquals(r.isComparability(), r.failure().isEmpty());
-
-        // NOTE (correctness, not totality): a brute-force oracle gives the 3-sun
-        // ZERO transitive orientations, so it is NOT a comparability graph, yet
-        // the thesis algorithm currently accepts it (comparability=true). That
-        // false positive is a soundness/completeness gap tracked under CGD-5 (D5);
-        // this test only pins down that the engine is now total.
+        // the obstruction is a real closed walk: consecutive vertices are edges
+        FailureCycle f = r.failure().orElseThrow();
+        for (int k = 0; k < f.length(); k++) {
+            int x = f.nodeIds().get(k);
+            int y = f.nodeIds().get((k + 1) % f.length());
+            assertTrue(hasEdge(r, x, y), "walk step " + x + "-" + y + " is an edge");
+        }
     }
 
     @Test
