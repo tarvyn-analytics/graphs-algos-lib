@@ -53,7 +53,9 @@ The maximal-modular-partition is still **O(n⁴)** on a *fully prime* graph
 `minimalModule` calls. This is not the target workload (correlation networks
 threshold down to sparse, structured graphs), so it is left as-is. The fix, if
 ever needed, is a near-linear modular-decomposition algorithm (partition
-refinement); guard any such change with `OracleCharacterizationTest`.
+refinement); guard any such change with `OracleCharacterizationTest`. A concrete,
+size-gated implementation plan for that upgrade is in
+[`docs/linear-md-plan.md`](linear-md-plan.md) (CGD-16).
 
 ## Parallelism (CGD-9 / D2)
 
