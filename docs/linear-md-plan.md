@@ -127,7 +127,8 @@ Each step lists the files a fresh session needs — read only those plus this pl
   different order. If any test asserts a specific order, normalise the output or
   update the test consciously (the count and verdict are order-invariant; only the
   display order can shift).
-- **Zero dependencies** (invariant #1) — hand-roll it; no graph library.
+- **Lean dependencies** (invariant #1) — prefer hand-rolling; add a graph library
+  only if it clearly beats porting a reference, and keep the footprint small.
 - Don't regress small-n latency — that's the whole point of the gate.
 
 ## 8. Acceptance criteria
