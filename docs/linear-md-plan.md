@@ -14,7 +14,8 @@ Progress against §5 (update this section whenever a step lands):
   `ModularDecomposition` builds one cached decomposition tree (`MDNode` +
   `buildTree()`); `orientationCount()` folds it and `levels()` takes its level-0
   partition from it (`rootBlocks`). Behaviour unchanged; oracle + full suite green.
-- [ ] **Step 2 — `buildTreeLinear()`** (the linear MD builder).  ← **next**
+- [ ] **Step 2 — `buildTreeLinear()`**, ported from the `fracture` algorithm in
+  `jonasspinner/modular-decomposition` (see §3).  ← **next**
 - [ ] **Step 3 — differential test** (lands with step 2).
 - [ ] **Step 4 — size gate.**
 - [ ] **Step 5 — benchmark + docs.**
@@ -49,14 +50,25 @@ fast. The comparability **verdict** lives in `ForcingRelation` (Golumbic Γ) and
   dependencies) — do not try to parallelise it. Cross-analysis parallelism stays
   in `BatchAnalyzer`.
 
-## 3. Which algorithm
+## 3. Which algorithm — decision (research 2026-06-16)
 
-**Tedder, Corneil, Habib & Paul (2008)** — the standard *simpler* linear-time MD
-(recursive partition refinement / factorizing permutation). Fallbacks if it's too
-much: Habib & Paul's near-linear O(n+m·α)/O(n+m·log n) variants, or McConnell &
-Spinrad (1999). Strongly prefer porting from a known-correct reference
-implementation and validating it differentially (§6) rather than coding from the
-paper cold.
+**Port the `fracture` algorithm from
+[`jonasspinner/modular-decomposition`](https://github.com/jonasspinner/modular-decomposition)
+(Rust).** A library survey found it has the cleanest API to port and that
+`fracture` benchmarked best on most instances. Reimplement its MD into our `MDNode`
+shape (§4) and validate it differentially against the simple recursion (§6).
+
+- **Scale fallback:** keep
+  [`mogproject/modular-decomposition`](https://github.com/mogproject/modular-decomposition)
+  (C++/Python) as a reference to consult *only if* very large graphs turn out slow
+  after the port.
+- **This is a port, not a dependency** — translate the algorithm into Java, add no
+  Rust/native runtime dep. Check the source licence before copying code directly;
+  reimplementing from the algorithm's description is always fine.
+
+Background theory (not the port target): Tedder, Corneil, Habib & Paul (2008),
+*simpler* linear-time MD via recursive factorizing permutations; Habib & Paul's
+survey; McConnell & Spinrad (1999). See §9.
 
 ## 4. Recommended design — build an explicit tree once
 
@@ -82,12 +94,13 @@ Each step lists the files a fresh session needs — read only those plus this pl
    `MDNode` + `buildTree()` in `ModularDecomposition`; `orientationCount()` folds the
    tree and `levels()` uses `rootBlocks(tree())` for level 0. The tree is the single
    swappable function; no algorithm change; oracle + suite unchanged.
-2. **Add `buildTreeLinear()`** — the Tedder et al. builder, producing the same
-   `MDNode` shape (`Kind` LEAF/PARALLEL/SERIES/PRIME). Add it as an alternative path;
-   keep the simple recursion the default (no gate yet — that's step 4) so the suite is
-   unaffected until step 3 trusts it.
+2. **Add `buildTreeLinear()`** — ported from the `fracture` algorithm in
+   `jonasspinner/modular-decomposition` (§3), producing the same `MDNode` shape
+   (`Kind` LEAF/PARALLEL/SERIES/PRIME). Add it as an alternative path; keep the simple
+   recursion the default (no gate yet — that's step 4) so the suite is unaffected
+   until step 3 trusts it.
    *Context:* `ModularDecomposition.java` (the `tree()` / `buildTree()` / `rootPartition`
-   region), §3–§4 and §6–§7 here, §9 references.
+   region), §3–§4 and §6–§7 here, §9 references, and the two repos in §3.
 3. **Differential test** (§6) — gate-free, asserts `buildTreeLinear` yields the same
    orientation count *and* the same levels as the simple recursion over ~10k random
    graphs n=6…14 plus the named families. Land it with step 2.
@@ -142,6 +155,10 @@ Each step lists the files a fresh session needs — read only those plus this pl
 
 ## 9. References
 
+- **Port target:** `jonasspinner/modular-decomposition` (Rust, the `fracture`
+  algorithm) — <https://github.com/jonasspinner/modular-decomposition>
+- **Scale fallback reference:** `mogproject/modular-decomposition` (C++/Python) —
+  <https://github.com/mogproject/modular-decomposition>
 - M. Tedder, D. Corneil, M. Habib, C. Paul, *"Simpler Linear-Time Modular
   Decomposition via Recursive Factorizing Permutations,"* ICALP 2008.
 - M. Habib, C. Paul, *"A survey of the algorithmic aspects of modular
