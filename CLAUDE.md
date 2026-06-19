@@ -47,8 +47,8 @@ library — there is no application to run; the tests are the executable spec.
    points (`ComparabilityAnalyzer`, `BatchAnalyzer`, `cli.ComparabilityCli`),
    `GraphInput`, the `model` records, the `export` serializers and the exceptions.
    Keep it that way — e.g. the CLI's `CorrelationCsv` reader stays package-private,
-   and the engine (`ForcingRelation`, `ModularDecomposition`, `ResultBuilder`) is
-   never exported.
+   and the engine (`ForcingRelation`, `ModularDecomposition`, `Chordality`,
+   `ResultBuilder`) is never exported.
 5. **Validation errors throw `InvalidInputException`** with the offending values
    in brackets, e.g. `"... got [3x0]"`. Null `GraphInput` to the analyzer throws
    `IllegalArgumentException`.
@@ -83,6 +83,14 @@ otherwise a closed walk that may revisit vertices — see `arcsToCycle`).
 / prime (maximal strong modules, found via minimal-module closure) and supplies
 both the count and the level/grouping view. Any change must still match the
 oracle; add new graph families to the oracle test.
+
+`Chordality` is a separate, independent engine (chordality ≠ comparability): it
+decides chordality via maximum-cardinality-search perfect-elimination ordering,
+recovers a hole on failure and produces a greedy (minimum-degree elimination
+game) chordal completion. Its own oracle is `ChordalityTest` (exhaustive over all
+graphs n ≤ 6: verdict, plus the witness is a real hole and the completion is
+chordal — invariant #2). It is computed for every analysis and surfaced as
+`AnalysisResult.chordality()`.
 
 ### Add a result field
 

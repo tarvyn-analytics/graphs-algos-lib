@@ -70,4 +70,30 @@ class DotExporterTest {
         assertTrue(dot.contains("color=red"));
         assertTrue(!dot.contains("penwidth=2"), "no weakest edge highlighted for adjacency input");
     }
+
+    @Test
+    void chordalCompletion_DrawsFillInEdgesDashed() {
+        // C4 is a hole: its chordal completion adds exactly one chord (drawn dashed/blue).
+        AnalysisResult r = ComparabilityAnalyzer.analyze(GraphInput.fromAdjacency(cycle(4)));
+        String dot = DotExporter.chordalCompletionToDot(r);
+
+        assertTrue(dot.startsWith("graph chordalCompletion {"));
+        assertTrue(dot.contains("0 -- 1;"), "input edges are solid");
+        assertTrue(dot.contains("style=dashed, color=blue"), "fill-in edge is dashed");
+        assertTrue(dot.lines().filter(l -> l.contains("style=dashed")).count() == 1, dot);
+    }
+
+    @Test
+    void chordalCompletion_ChordalGraph_HasNoFillIn() {
+        // A triangle is already chordal: no fill-in edges, hence no dashed lines.
+        boolean[][] triangle = {
+                {false, true, true},
+                {true, false, true},
+                {true, true, false}
+        };
+        AnalysisResult r = ComparabilityAnalyzer.analyze(GraphInput.fromAdjacency(triangle));
+        String dot = DotExporter.chordalCompletionToDot(r);
+        assertTrue(dot.startsWith("graph chordalCompletion {"));
+        assertTrue(!dot.contains("dashed"), "already chordal -> no fill-in edges");
+    }
 }

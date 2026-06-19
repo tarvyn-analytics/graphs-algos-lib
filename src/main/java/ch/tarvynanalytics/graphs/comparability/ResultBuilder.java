@@ -1,6 +1,7 @@
 package ch.tarvynanalytics.graphs.comparability;
 
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
+import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
 import ch.tarvynanalytics.graphs.comparability.model.FactorGraphLevelView;
 import ch.tarvynanalytics.graphs.comparability.model.FailureCycle;
@@ -40,8 +41,29 @@ final class ResultBuilder {
         List<FactorGraphLevelView> levels = md.levels(input);
         BigInteger count = fr.comparable ? md.orientationCount() : BigInteger.ZERO;
         FailureCycle failure = fr.comparable ? null : buildFailure(input, fr.failureWalk);
+        ChordalityView chordality = buildChordality(input, Chordality.analyze(adj));
 
-        return new AnalysisResult(fr.comparable, inputGraph, levels, count, failure);
+        return new AnalysisResult(fr.comparable, inputGraph, levels, count, failure, chordality);
+    }
+
+    private static ChordalityView buildChordality(GraphInput input, Chordality.Result result) {
+        List<Integer> peoIds = new ArrayList<>();
+        List<String> peoLabels = new ArrayList<>();
+        for (int v : result.eliminationOrder) {
+            peoIds.add(v);
+            peoLabels.add(input.label(v));
+        }
+        List<Integer> holeIds = new ArrayList<>();
+        List<String> holeLabels = new ArrayList<>();
+        for (int v : result.chordlessCycle) {
+            holeIds.add(v);
+            holeLabels.add(input.label(v));
+        }
+        List<EdgeView> fillIn = new ArrayList<>();
+        for (int[] e : result.fillIn) {
+            fillIn.add(new EdgeView(e[0], e[1]));
+        }
+        return new ChordalityView(result.chordal, peoIds, peoLabels, holeIds, holeLabels, fillIn);
     }
 
     private static GraphView inputGraphView(GraphInput input, boolean[][] adj) {

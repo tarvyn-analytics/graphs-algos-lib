@@ -6,6 +6,7 @@ import java.math.BigInteger;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -49,17 +50,39 @@ class ModelTest {
         assertEquals(0, f.weakestEdgeTarget());
     }
 
+    private static ChordalityView chordal() {
+        return new ChordalityView(true, List.of(2, 1, 0), List.of("c", "b", "a"),
+                List.of(), List.of(), List.of());
+    }
+
     @Test
     void analysisResult_FailureOptionalAndImmutability() {
         FactorGraphLevelView level = new FactorGraphLevelView(0, triangle(), List.of(), triangle());
-        AnalysisResult ok = new AnalysisResult(true, triangle(), List.of(level), BigInteger.valueOf(6), null);
+        AnalysisResult ok = new AnalysisResult(true, triangle(), List.of(level), BigInteger.valueOf(6),
+                null, chordal());
         assertTrue(ok.isComparability());
         assertTrue(ok.failure().isEmpty());
         assertThrows(UnsupportedOperationException.class, () -> ok.levels().clear());
 
         FailureCycle f = new FailureCycle(0, List.of(0, 1, 2), List.of("0", "1", "2"), Double.NaN, -1, -1);
-        AnalysisResult bad = new AnalysisResult(false, triangle(), List.of(level), BigInteger.ZERO, f);
+        AnalysisResult bad = new AnalysisResult(false, triangle(), List.of(level), BigInteger.ZERO,
+                f, chordal());
         assertEquals(f, bad.failure().orElseThrow());
+    }
+
+    @Test
+    void chordalityView_AccessorsAndImmutability() {
+        ChordalityView yes = chordal();
+        assertTrue(yes.isChordal());
+        assertEquals(0, yes.fillInCount());
+        assertThrows(UnsupportedOperationException.class, () -> yes.perfectEliminationOrder().clear());
+
+        ChordalityView no = new ChordalityView(false, List.of(0, 1, 2, 3), List.of("0", "1", "2", "3"),
+                List.of(0, 1, 2, 3), List.of("0", "1", "2", "3"), List.of(new EdgeView(0, 2)));
+        assertFalse(no.isChordal());
+        assertEquals(1, no.fillInCount());
+        assertEquals(new EdgeView(0, 2), no.fillInEdges().get(0));
+        assertThrows(UnsupportedOperationException.class, () -> no.fillInEdges().clear());
     }
 
     @Test

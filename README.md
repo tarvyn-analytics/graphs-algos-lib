@@ -16,6 +16,11 @@ Given a matrix it produces one of two outcomes:
   correlation edge on it (the cheapest edge to drop, e.g. by raising the
   threshold, to break the obstruction).
 
+Independently of that verdict it also reports whether the same graph is
+**chordal** (decomposable) — a perfect elimination ordering when it is, otherwise
+a witnessing hole and a greedy **chordal completion** (the fill-in edges that make
+it decomposable). See [Chordality / decomposability](#chordality--decomposability).
+
 There is no GUI and there are **zero runtime dependencies**; the result is a
 plain immutable object you can inspect or serialize.
 
@@ -92,6 +97,45 @@ edge either way.
 > was found to be unsound, incomplete and to under-count; see
 > `docs/theory-review.md`.)
 
+## Chordality / decomposability
+
+Every result also carries `chordality()`, computed independently of the
+comparability verdict. A graph is **chordal** (triangulated) iff every cycle of
+length ≥ 4 has a chord — equivalently, iff it has a *perfect elimination
+ordering*. Chordal graphs are exactly the **decomposable** models: when the
+(partial-)correlation graph is chordal, the Gaussian graphical model factorizes
+over a clique (junction) tree and the covariance / precision MLE is closed-form
+and modular.
+
+```java
+ChordalityView c = result.chordality();
+if (c.isChordal()) {
+    // a perfect elimination ordering of the graph (the clique-tree order)
+    System.out.println("decomposable; PEO: " + c.perfectEliminationOrder());
+} else {
+    System.out.println("chordless cycle: " + c.chordlessCycleLabels());
+    System.out.println("chordal completion adds " + c.fillInCount() + " edge(s): "
+            + c.fillInEdges());            // the fill-in that makes it decomposable
+}
+```
+
+When the graph is **chordal**, `perfectEliminationOrder()` is a PEO and both the
+hole and the fill-in are empty. When it is **not**, `chordlessCycle()` is a
+witnessing hole, `fillInEdges()` is a greedy chordal completion and
+`perfectEliminationOrder()` is a PEO of that completion (input graph + fill-in).
+
+> **Scope.** Detection is maximum-cardinality search (Tarjan–Yannakakis); on
+> failure a hole is recovered as the obstruction. The completion is the
+> elimination game with a minimum-degree heuristic — any elimination order yields
+> a chordal completion, the heuristic only keeps the fill-in small. **Minimum**
+> fill-in is NP-hard, so the completion is *not* guaranteed minimal. Verdict,
+> witness and completion are cross-checked against a brute-force oracle over every
+> graph up to six vertices.
+
+Note comparability and chordality are independent: `C₄` is comparability but not
+chordal, the `3-sun` is chordal but not comparability, `K₄` is both and `C₅` is
+neither.
+
 ## Storing / exporting the result
 
 The result is a plain object — keep it, or serialize it with the built-in,
@@ -104,6 +148,7 @@ import ch.tarvynanalytics.graphs.comparability.export.DotExporter;
 String json = JsonExporter.toJson(result);                 // full result as JSON
 String dot  = DotExporter.inputGraphToDot(result);         // input graph as Graphviz DOT
 String lvl  = DotExporter.factorLevelToDot(result.levels().get(0));
+String comp = DotExporter.chordalCompletionToDot(result);  // input edges solid, fill-in dashed
 
 result.failure().ifPresent(f ->
     System.out.println(DotExporter.failureCycleToDot(f)));  // odd cycle, weakest edge in red
@@ -112,8 +157,10 @@ result.failure().ifPresent(f ->
 Render DOT with Graphviz, e.g. `dot -Tsvg graph.dot -o graph.svg`. The JSON
 mirrors the model: `comparability`, `transitiveOrientationCount` (a bare
 arbitrary-precision integer), `inputGraph`, `levels[]` (each with `graph`,
-`modules`, `factorGraph`) and `failure` (`null`, or the cycle with its
-`weakestCorrelation` / `weakestEdge`; a non-finite correlation is `null`).
+`modules`, `factorGraph`), `failure` (`null`, or the cycle with its
+`weakestCorrelation` / `weakestEdge`; a non-finite correlation is `null`) and
+`chordality` (`chordal`, `perfectEliminationOrder`, `chordlessCycle`,
+`fillInEdges`).
 
 ## Batch analysis (threshold sweeps, parallel)
 
@@ -162,7 +209,11 @@ edges:         1
 comparability: YES
 transitive orientations: 2
 decomposition levels:    4
+chordal:       YES (decomposable)
 ```
+
+When the graph is not chordal the CLI prints `chordal: NO` instead, with the
+chordless cycle and the number of fill-in edges its chordal completion adds.
 
 An edge is created for every pair with `|correlation| > |threshold|`
 (`--threshold` / `-t`, default `0.5`). `--json` emits the full `AnalysisResult`
@@ -180,12 +231,14 @@ ch.tarvynanalytics.graphs.comparability
   GraphInput              – build the graph from a correlation or adjacency matrix
   (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
                             ModularDecomposition (count + factor-graph levels),
+                            Chordality (chordality verdict + PEO / hole / completion),
                             ResultBuilder: the engine; not exported
   .cli                    – ComparabilityCli (java -jar entry point over a CSV;
                             package-private CorrelationCsv reader)
   .model                  – immutable result types (records):
                             AnalysisResult, GraphView, NodeView, EdgeView,
-                            FactorGraphLevelView, ModuleView, ModuleType, FailureCycle
+                            FactorGraphLevelView, ModuleView, ModuleType,
+                            FailureCycle, ChordalityView
   .export                 – JsonExporter, DotExporter (zero-dependency serializers)
   .exception              – ComparabilityException, InvalidInputException
 ```

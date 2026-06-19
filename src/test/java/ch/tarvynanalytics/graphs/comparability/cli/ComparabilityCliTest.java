@@ -87,6 +87,9 @@ class ComparabilityCliTest {
         assertEquals(0, code);
         assertTrue(out().contains("comparability: YES"), out());
         assertTrue(out().contains("transitive orientations: 6"), out());
+        // K3 is also chordal (decomposable).
+        assertTrue(out().contains("chordal:"), out());
+        assertTrue(out().contains("YES (decomposable)"), out());
     }
 
     @Test
@@ -97,6 +100,10 @@ class ComparabilityCliTest {
         assertTrue(out().contains("comparability: NO"), out());
         assertTrue(out().contains("obstructing odd cycle (length 5)"), out());
         assertTrue(out().contains("weakest edge:"), out());
+        // C5 is also non-chordal (it is a 5-hole); its completion adds n-3 = 2 chords.
+        assertTrue(out().contains("chordal:"), out());
+        assertTrue(out().contains("chordless cycle (length 5)"), out());
+        assertTrue(out().contains("chordal completion: 2 fill-in edge(s)"), out());
     }
 
     @Test
@@ -127,6 +134,7 @@ class ComparabilityCliTest {
         assertEquals(0, code);
         assertTrue(out().startsWith("{"), out());
         assertTrue(out().contains("\"comparability\":true"), out());
+        assertTrue(out().contains("\"chordality\":"), out());
     }
 
     @Test

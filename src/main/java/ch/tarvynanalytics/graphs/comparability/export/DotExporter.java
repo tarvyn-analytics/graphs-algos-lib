@@ -1,6 +1,7 @@
 package ch.tarvynanalytics.graphs.comparability.export;
 
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
+import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
 import ch.tarvynanalytics.graphs.comparability.model.FactorGraphLevelView;
 import ch.tarvynanalytics.graphs.comparability.model.FailureCycle;
@@ -65,6 +66,37 @@ public final class DotExporter {
                 sb.append(" [color=red]");
             }
             sb.append(";\n");
+        }
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    /**
+     * Renders the chordal completion as DOT: the input graph's edges solid, plus
+     * the fill-in edges (the extra edges that make the graph chordal) dashed and
+     * blue. For an already-chordal graph there are no fill-in edges, so this is
+     * just the input graph.
+     *
+     * @param result the analysis result
+     * @return the chordal completion as DOT
+     */
+    public static String chordalCompletionToDot(AnalysisResult result) {
+        GraphView g = result.inputGraph();
+        ChordalityView c = result.chordality();
+        StringBuilder sb = new StringBuilder(160);
+        sb.append("graph chordalCompletion {\n");
+        sb.append("  node [shape=circle];\n");
+        for (NodeView node : g.nodes()) {
+            sb.append("  ").append(node.id()).append(" [label=");
+            quote(sb, node.label());
+            sb.append("];\n");
+        }
+        for (EdgeView e : g.edges()) {
+            sb.append("  ").append(e.source()).append(" -- ").append(e.target()).append(";\n");
+        }
+        for (EdgeView e : c.fillInEdges()) {
+            sb.append("  ").append(e.source()).append(" -- ").append(e.target())
+                    .append(" [style=dashed, color=blue];\n");
         }
         sb.append("}\n");
         return sb.toString();
