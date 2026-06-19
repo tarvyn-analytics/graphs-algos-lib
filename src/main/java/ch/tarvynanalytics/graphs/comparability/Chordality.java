@@ -227,7 +227,16 @@ final class Chordality {
     // Chordal completion: minimum-degree elimination game
     // ------------------------------------------------------------------
 
-    private record Completion(int[] order, int[][] fillIn) {
+    /** Carrier for a completion: a PEO of the filled graph and the fill-in edges. Plain class (not a
+     * record) because its fields are arrays — record equals/hashCode would compare them by identity. */
+    private static final class Completion {
+        final int[] order;
+        final int[][] fillIn;
+
+        Completion(int[] order, int[][] fillIn) {
+            this.order = order;
+            this.fillIn = fillIn;
+        }
     }
 
     /**
