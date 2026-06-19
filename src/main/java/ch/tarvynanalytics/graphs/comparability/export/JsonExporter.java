@@ -2,6 +2,7 @@ package ch.tarvynanalytics.graphs.comparability.export;
 
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
 import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
+import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
 import ch.tarvynanalytics.graphs.comparability.model.FactorGraphLevelView;
 import ch.tarvynanalytics.graphs.comparability.model.FailureCycle;
@@ -63,6 +64,42 @@ public final class JsonExporter {
         sb.append(",\"chordality\":");
         chordality(sb, result.chordality());
         sb.append('}');
+        return sb.toString();
+    }
+
+    /**
+     * Serializes a {@link DecomposabilityReport} (the weakest-link deletion repair) to JSON.
+     *
+     * @param report the decomposability diagnostic
+     * @return the report as a JSON document
+     */
+    public static String toJson(DecomposabilityReport report) {
+        StringBuilder sb = new StringBuilder(128);
+        sb.append("{\"decomposable\":").append(report.decomposable());
+        sb.append(",\"suggestedThreshold\":");
+        if (Double.isFinite(report.suggestedThreshold())) {
+            sb.append(report.suggestedThreshold());
+        } else {
+            sb.append("null");
+        }
+        sb.append(",\"fillInAlternative\":").append(report.fillInAlternative());
+        sb.append(",\"weakestLinksToRemove\":[");
+        for (int i = 0; i < report.weakestLinksToRemove().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            EdgeView e = report.weakestLinksToRemove().get(i);
+            double corr = report.removedCorrelations().get(i);
+            sb.append("{\"source\":").append(e.source()).append(",\"target\":").append(e.target())
+                    .append(",\"correlation\":");
+            if (Double.isFinite(corr)) {
+                sb.append(corr);
+            } else {
+                sb.append("null");
+            }
+            sb.append('}');
+        }
+        sb.append("]}");
         return sb.toString();
     }
 
