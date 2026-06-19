@@ -51,6 +51,22 @@ class JsonExporterTest {
         assertTrue(json.contains("\"failure\":null"));
         assertTrue(json.contains("\"inputGraph\":"));
         assertTrue(json.contains("\"levels\":["));
+        // K3 is also chordal: chordal=true, empty hole and fill-in.
+        assertTrue(json.contains("\"chordality\":{\"chordal\":true"));
+        assertTrue(json.contains("\"chordlessCycle\":[]"));
+        assertTrue(json.contains("\"fillInEdges\":[]"));
+        assertBalanced(json);
+    }
+
+    @Test
+    void nonChordalGraph_SerializesHoleAndFillIn() {
+        // C4 is a hole: not chordal, witnessed by the 4-cycle, completed with one chord.
+        AnalysisResult r = ComparabilityAnalyzer.analyze(GraphInput.fromAdjacency(cycle(4)));
+        String json = JsonExporter.toJson(r);
+
+        assertTrue(json.contains("\"chordality\":{\"chordal\":false"));
+        assertTrue(json.contains("\"chordlessCycle\":[0,1,2,3]"), json);
+        assertTrue(json.contains("\"fillInEdges\":[{\"source\":1,\"target\":3}]"), json);
         assertBalanced(json);
     }
 

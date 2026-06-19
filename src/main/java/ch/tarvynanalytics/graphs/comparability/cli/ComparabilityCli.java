@@ -5,6 +5,7 @@ import ch.tarvynanalytics.graphs.comparability.GraphInput;
 import ch.tarvynanalytics.graphs.comparability.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.comparability.export.JsonExporter;
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
+import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -155,6 +156,18 @@ public final class ComparabilityCli {
                             + " (correlation " + corr + ")");
                 }
             });
+        }
+        printChordality(out, result.chordality());
+    }
+
+    private static void printChordality(PrintStream out, ChordalityView chordality) {
+        if (chordality.isChordal()) {
+            out.println("chordal:       YES (decomposable)");
+        } else {
+            out.println("chordal:       NO");
+            out.println("chordless cycle (length " + chordality.chordlessCycle().size() + "): "
+                    + String.join(" - ", chordality.chordlessCycleLabels()));
+            out.println("chordal completion: " + chordality.fillInCount() + " fill-in edge(s)");
         }
     }
 

@@ -1,6 +1,7 @@
 package ch.tarvynanalytics.graphs.comparability.export;
 
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
+import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
 import ch.tarvynanalytics.graphs.comparability.model.FactorGraphLevelView;
 import ch.tarvynanalytics.graphs.comparability.model.FailureCycle;
@@ -19,7 +20,9 @@ import ch.tarvynanalytics.graphs.comparability.model.NodeView;
  *   "transitiveOrientationCount": 6,
  *   "inputGraph": { "nodes": [{"id":0,"label":"a"}], "edges": [{"source":0,"target":1}] },
  *   "levels": [ { "level":0, "graph": {...}, "modules": [...], "factorGraph": {...} } ],
- *   "failure": null
+ *   "failure": null,
+ *   "chordality": { "chordal":true, "perfectEliminationOrder":[2,1,0],
+ *                   "chordlessCycle":[], "fillInEdges":[] }
  * }
  * }</pre>
  *
@@ -57,8 +60,27 @@ public final class JsonExporter {
         } else {
             failure(sb, result.failureCycle());
         }
+        sb.append(",\"chordality\":");
+        chordality(sb, result.chordality());
         sb.append('}');
         return sb.toString();
+    }
+
+    private static void chordality(StringBuilder sb, ChordalityView c) {
+        sb.append("{\"chordal\":").append(c.chordal());
+        sb.append(",\"perfectEliminationOrder\":");
+        ints(sb, c.perfectEliminationOrder());
+        sb.append(",\"chordlessCycle\":");
+        ints(sb, c.chordlessCycle());
+        sb.append(",\"fillInEdges\":[");
+        for (int i = 0; i < c.fillInEdges().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            EdgeView e = c.fillInEdges().get(i);
+            sb.append("{\"source\":").append(e.source()).append(",\"target\":").append(e.target()).append('}');
+        }
+        sb.append("]}");
     }
 
     private static void level(StringBuilder sb, FactorGraphLevelView level) {

@@ -185,6 +185,7 @@ class ComparabilityAnalyzerTest {
         AnalysisResult r = assertTimeoutPreemptively(Duration.ofSeconds(10), () -> analyze(a));
         assertFalse(r.isComparability(), "the 3-sun is not a comparability graph");
         assertEquals(BigInteger.ZERO, r.transitiveOrientationCount());
+        assertTrue(r.chordality().isChordal(), "yet the 3-sun IS chordal");
 
         // the obstruction is a real closed walk: consecutive vertices are edges
         FailureCycle f = r.failure().orElseThrow();
@@ -193,6 +194,38 @@ class ComparabilityAnalyzerTest {
             int y = f.nodeIds().get((k + 1) % f.length());
             assertTrue(hasEdge(r, x, y), "walk step " + x + "-" + y + " is an edge");
         }
+    }
+
+    @Test
+    void comparabilityAndChordality_AreIndependentProperties() {
+        // The 2x2 matrix of (comparability, chordality):
+        // K4   — comparability AND chordal
+        AnalysisResult k4 = analyze(complete(4));
+        assertTrue(k4.isComparability());
+        assertTrue(k4.chordality().isChordal());
+        // C4   — comparability (even cycle) but NOT chordal (a 4-hole)
+        AnalysisResult c4 = analyze(cycle(4));
+        assertTrue(c4.isComparability());
+        assertFalse(c4.chordality().isChordal());
+        assertEquals(1, c4.chordality().fillInCount(), "C4 needs one chord to triangulate");
+        // C5   — NOT comparability and NOT chordal (a 5-hole)
+        AnalysisResult c5 = analyze(cycle(5));
+        assertFalse(c5.isComparability());
+        assertFalse(c5.chordality().isChordal());
+        // 3-sun — NOT comparability yet chordal (covered in threeSun_… too)
+        boolean[][] sun = new boolean[6][6];
+        link(sun, 0, 1);
+        link(sun, 1, 2);
+        link(sun, 0, 2);
+        link(sun, 3, 0);
+        link(sun, 3, 1);
+        link(sun, 4, 1);
+        link(sun, 4, 2);
+        link(sun, 5, 0);
+        link(sun, 5, 2);
+        AnalysisResult s = analyze(sun);
+        assertFalse(s.isComparability());
+        assertTrue(s.chordality().isChordal());
     }
 
     @Test
