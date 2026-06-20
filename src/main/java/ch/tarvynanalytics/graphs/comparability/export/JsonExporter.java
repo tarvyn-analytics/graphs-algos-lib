@@ -9,6 +9,7 @@ import ch.tarvynanalytics.graphs.comparability.model.FailureCycle;
 import ch.tarvynanalytics.graphs.comparability.model.GraphView;
 import ch.tarvynanalytics.graphs.comparability.model.ModuleView;
 import ch.tarvynanalytics.graphs.comparability.model.NodeView;
+import ch.tarvynanalytics.graphs.comparability.model.StructuralBalanceView;
 
 /**
  * Serializes an {@link AnalysisResult} to a compact JSON document. Hand-rolled
@@ -117,6 +118,24 @@ public final class JsonExporter {
             edgeRef(sb, e.source(), e.target()).append('}');
         }
         sb.append("]}");
+    }
+
+    /**
+     * Serializes a {@link StructuralBalanceView} (the signed-graph balance verdict) to JSON.
+     *
+     * @param balance the structural-balance view
+     * @return the view as a JSON document
+     */
+    public static String toJson(StructuralBalanceView balance) {
+        StringBuilder sb = new StringBuilder(96);
+        sb.append("{\"balanced\":").append(balance.balanced());
+        sb.append(",\"negativeEdgeCount\":").append(balance.negativeEdgeCount());
+        sb.append(",\"camp\":");
+        ints(sb, balance.camp());
+        sb.append(",\"frustratedCycle\":");
+        ints(sb, balance.frustratedCycle());
+        sb.append('}');
+        return sb.toString();
     }
 
     /** Appends {@code {"source":S,"target":T} without the closing brace, for the caller to finish. */

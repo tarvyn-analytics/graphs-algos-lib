@@ -159,6 +159,31 @@ exactly which weak dependencies frustrate a decomposable (junction-tree) model.
 It is greedy (minimum edge deletion to chordal is NP-hard, so the set is not
 guaranteed minimum) but always terminates and is a principled diagnostic.
 
+## Structural balance (signed correlation graph)
+
+The analyses above ignore the *sign* of a correlation. `StructuralBalanceAnalyzer`
+keeps it and tests **structural balance** (Heider / Harary): a signed graph is
+balanced iff every cycle has an even number of negative edges — equivalently, iff
+its vertices split into two camps with positive edges *within* a camp and negative
+edges *between* them. For a correlation graph that means the names fall into two
+blocs that are internally positively correlated and mutually negatively correlated.
+
+```java
+StructuralBalanceView b = StructuralBalanceAnalyzer.analyze(
+        GraphInput.fromCorrelation(matrix, 0.5));
+if (b.isBalanced()) {
+    System.out.println("two blocs: " + b.verticesInCamp(0) + " vs " + b.verticesInCamp(1));
+} else {
+    System.out.println("frustrated cycle: " + b.frustratedCycleLabels());  // odd # of negatives
+}
+```
+
+It is a separate, opt-in analyzer because balance is sign-dependent whereas the
+main `AnalysisResult` is sign-agnostic. Decided in linear time by a signed BFS
+2-colouring; on failure it returns a witnessing cycle with an odd number of
+negative edges. A graph built from a plain boolean adjacency carries no signs
+(every edge positive), so it is trivially balanced.
+
 ## Storing / exporting the result
 
 The result is a plain object — keep it, or serialize it with the built-in,
@@ -242,10 +267,11 @@ An edge is created for every pair with `|correlation| > |threshold|`
 (`--threshold` / `-t`, default `0.5`). `--json` emits the result as JSON (the
 `JsonExporter` shape); `--repair` switches to the decomposability diagnostic —
 the weakest links to remove to make the graph chordal (with `--json`, the
-`DecomposabilityReport` JSON); `--help` shows usage. Exit codes are
-**result-only**: `0` when the analysis ran (whatever the verdict), `2` for a
-usage error, `1` for an input/IO error — read the verdict from the output, not
-the exit code.
+`DecomposabilityReport` JSON); `--balance` switches to the signed-graph
+structural-balance verdict (the two correlation blocs, or a frustrated cycle);
+`--help` shows usage. Exit codes are **result-only**: `0` when the analysis ran
+(whatever the verdict), `2` for a usage error, `1` for an input/IO error — read
+the verdict from the output, not the exit code.
 
 ## Package layout
 
@@ -254,17 +280,20 @@ ch.tarvynanalytics.graphs.comparability
   ComparabilityAnalyzer   – entry point: analyze(GraphInput) -> AnalysisResult
   BatchAnalyzer           – run many analyses / threshold sweeps, optionally parallel
   DecomposabilityDiagnostic – weakest-link repair to a chordal (decomposable) graph
+  StructuralBalanceAnalyzer – signed-graph structural balance (Heider/Harary)
   GraphInput              – build the graph from a correlation or adjacency matrix
   (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
                             ModularDecomposition (count + factor-graph levels),
                             Chordality (chordality verdict + PEO / hole / completion),
+                            StructuralBalance (signed BFS 2-colouring),
                             ResultBuilder: the engine; not exported
   .cli                    – ComparabilityCli (java -jar entry point over a CSV;
                             package-private CorrelationCsv reader)
   .model                  – immutable result types (records):
                             AnalysisResult, GraphView, NodeView, EdgeView,
                             FactorGraphLevelView, ModuleView, ModuleType,
-                            FailureCycle, ChordalityView, DecomposabilityReport
+                            FailureCycle, ChordalityView, DecomposabilityReport,
+                            StructuralBalanceView
   .export                 – JsonExporter, DotExporter (zero-dependency serializers)
   .exception              – ComparabilityException, InvalidInputException
 ```

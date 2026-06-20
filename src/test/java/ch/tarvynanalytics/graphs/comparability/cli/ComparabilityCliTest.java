@@ -42,6 +42,22 @@ class ComparabilityCliTest {
             0.6,1.0
             """;
 
+    // A triangle with two negative edges (a-c, b-c): structurally balanced, camps {a,b} vs {c}.
+    private static final String BALANCED = """
+            a,b,c
+            1.0,0.9,-0.9
+            0.9,1.0,-0.9
+            -0.9,-0.9,1.0
+            """;
+
+    // A triangle with one negative edge (a-c): an odd negative cycle, not balanced.
+    private static final String UNBALANCED = """
+            a,b,c
+            1.0,0.9,-0.9
+            0.9,1.0,0.9
+            -0.9,0.9,1.0
+            """;
+
     @TempDir
     Path dir;
 
@@ -163,6 +179,36 @@ class ComparabilityCliTest {
         assertTrue(out().startsWith("{"), out());
         assertTrue(out().contains("\"decomposable\":false"), out());
         assertTrue(out().contains("\"weakestLinksToRemove\":["), out());
+    }
+
+    @Test
+    void run_BalanceOnBalancedSignedGraph_ReportsTwoBlocs() {
+        int code = run(csv("balanced.csv", BALANCED).toString(), "--balance");
+
+        assertEquals(0, code);
+        assertTrue(out().contains("balanced:      YES"), out());
+        assertTrue(out().contains("negative edges: 2"), out());
+        assertTrue(out().contains("camp A (2): a, b"), out());
+        assertTrue(out().contains("camp B (1): c"), out());
+    }
+
+    @Test
+    void run_BalanceOnUnbalancedSignedGraph_ReportsFrustratedCycle() {
+        int code = run(csv("unbalanced.csv", UNBALANCED).toString(), "--balance");
+
+        assertEquals(0, code);
+        assertTrue(out().contains("balanced:      NO"), out());
+        assertTrue(out().contains("frustrated cycle (length 3)"), out());
+    }
+
+    @Test
+    void run_BalanceJson_EmitsBalanceJson() {
+        int code = run(csv("unbalanced.csv", UNBALANCED).toString(), "--balance", "--json");
+
+        assertEquals(0, code);
+        assertTrue(out().startsWith("{"), out());
+        assertTrue(out().contains("\"balanced\":false"), out());
+        assertTrue(out().contains("\"negativeEdgeCount\":1"), out());
     }
 
     @Test

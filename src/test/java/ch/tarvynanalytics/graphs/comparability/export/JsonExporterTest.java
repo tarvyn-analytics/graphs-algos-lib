@@ -3,8 +3,10 @@ package ch.tarvynanalytics.graphs.comparability.export;
 import ch.tarvynanalytics.graphs.comparability.ComparabilityAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.DecomposabilityDiagnostic;
 import ch.tarvynanalytics.graphs.comparability.GraphInput;
+import ch.tarvynanalytics.graphs.comparability.StructuralBalanceAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
 import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
+import ch.tarvynanalytics.graphs.comparability.model.StructuralBalanceView;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -128,6 +130,24 @@ class JsonExporterTest {
         assertTrue(json.contains("\"decomposable\":true"), json);
         assertTrue(json.contains("\"suggestedThreshold\":null"), json);
         assertTrue(json.contains("\"weakestLinksToRemove\":[]"), json);
+        assertBalanced(json);
+    }
+
+    @Test
+    void structuralBalance_SerializesVerdictCampsAndCycle() {
+        // A triangle with one negative edge (0-2): unbalanced, the whole triangle is the cycle.
+        double[][] m = {
+                {1.0, 0.9, -0.9},
+                {0.9, 1.0, 0.9},
+                {-0.9, 0.9, 1.0}
+        };
+        StructuralBalanceView b = StructuralBalanceAnalyzer.analyze(GraphInput.fromCorrelation(m, 0.5));
+        String json = JsonExporter.toJson(b);
+
+        assertTrue(json.contains("\"balanced\":false"), json);
+        assertTrue(json.contains("\"negativeEdgeCount\":1"), json);
+        assertTrue(json.contains("\"camp\":[]"), json);
+        assertTrue(json.contains("\"frustratedCycle\":["), json);
         assertBalanced(json);
     }
 
