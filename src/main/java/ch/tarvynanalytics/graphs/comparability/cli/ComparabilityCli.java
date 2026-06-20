@@ -59,61 +59,17 @@ public final class ComparabilityCli {
      * @return the exit code: {@code 0} success, {@code 2} usage error, {@code 1} input/IO error
      */
     static int run(String[] args, PrintStream out, PrintStream err) {
-        String path = null;
-        double threshold = DEFAULT_THRESHOLD;
-        boolean json = false;
-        boolean repair = false;
-
-        for (int i = 0; i < args.length; i++) {
-            String arg = args[i];
-            switch (arg) {
-                case "-h", "--help" -> {
-                    printUsage(out);
-                    return 0;
-                }
-                case "--json" -> json = true;
-                case "--repair" -> repair = true;
-                case "-t", "--threshold" -> {
-                    if (i + 1 >= args.length) {
-                        err.println("error: " + arg + " requires a value");
-                        printUsage(err);
-                        return 2;
-                    }
-                    String value = args[++i];
-                    try {
-                        threshold = Double.parseDouble(value);
-                    } catch (NumberFormatException e) {
-                        err.println("error: invalid threshold, got [" + value + "]");
-                        return 2;
-                    }
-                }
-                default -> {
-                    if (arg.startsWith("-")) {
-                        err.println("error: unknown option [" + arg + "]");
-                        printUsage(err);
-                        return 2;
-                    }
-                    if (path != null) {
-                        err.println("error: unexpected extra argument [" + arg + "]");
-                        printUsage(err);
-                        return 2;
-                    }
-                    path = arg;
-                }
-            }
+        ParseResult parse = parseArgs(args, out, err);
+        if (parse.shouldExit()) {
+            return parse.exitCode();
         }
-
-        if (path == null) {
-            err.println("error: missing <csv-path>");
-            printUsage(err);
-            return 2;
-        }
+        Options options = parse.options();
 
         CorrelationCsv.Parsed parsed;
         try {
-            parsed = CorrelationCsv.read(Path.of(path));
+            parsed = CorrelationCsv.read(Path.of(options.path()));
         } catch (IOException e) {
-            err.println("error: cannot read file [" + path + "]: " + e.getMessage());
+            err.println("error: cannot read file [" + options.path() + "]: " + e.getMessage());
             return 1;
         } catch (InvalidInputException e) {
             err.println("error: " + e.getMessage());
@@ -122,27 +78,117 @@ public final class ComparabilityCli {
 
         GraphInput input;
         try {
-            input = GraphInput.fromCorrelation(parsed.matrix(), threshold, parsed.labels());
+            input = GraphInput.fromCorrelation(parsed.matrix(), options.threshold(), parsed.labels());
         } catch (InvalidInputException e) {
             err.println("error: " + e.getMessage());
             return 1;
         }
 
-        if (repair) {
+        return dispatch(out, options, parsed.labels(), input);
+    }
+
+    /** The parsed command-line options. */
+    private record Options(String path, double threshold, boolean json, boolean repair) {
+    }
+
+    /** Either parsed options, or an exit code to return immediately (help / usage error). */
+    private record ParseResult(Options options, int exitCode) {
+        static ParseResult ok(Options options) {
+            return new ParseResult(options, -1);
+        }
+
+        static ParseResult exit(int code) {
+            return new ParseResult(null, code);
+        }
+
+        boolean shouldExit() {
+            return options == null;
+        }
+    }
+
+    private static ParseResult parseArgs(String[] args, PrintStream out, PrintStream err) {
+        String path = null;
+        double threshold = DEFAULT_THRESHOLD;
+        boolean json = false;
+        boolean repair = false;
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+            switch (arg) {
+                case "-h", "--help" -> {
+                    printUsage(out);
+                    return ParseResult.exit(0);
+                }
+                case "--json" -> json = true;
+                case "--repair" -> repair = true;
+                case "-t", "--threshold" -> {
+                    Double value = parseThreshold(args, i, arg, err);
+                    if (value == null) {
+                        return ParseResult.exit(2);
+                    }
+                    threshold = value;
+                    i++;
+                }
+                default -> {
+                    String error = positionalError(arg, path);
+                    if (error != null) {
+                        err.println(error);
+                        printUsage(err);
+                        return ParseResult.exit(2);
+                    }
+                    path = arg;
+                }
+            }
+        }
+        if (path == null) {
+            err.println("error: missing <csv-path>");
+            printUsage(err);
+            return ParseResult.exit(2);
+        }
+        return ParseResult.ok(new Options(path, threshold, json, repair));
+    }
+
+    /** Parses the threshold value following {@code flag} at {@code args[i]}, or {@code null} on error. */
+    private static Double parseThreshold(String[] args, int i, String flag, PrintStream err) {
+        if (i + 1 >= args.length) {
+            err.println("error: " + flag + " requires a value");
+            printUsage(err);
+            return null;
+        }
+        String value = args[i + 1];
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            err.println("error: invalid threshold, got [" + value + "]");
+            return null;
+        }
+    }
+
+    /** An error message for a positional argument (unknown option / extra path), or {@code null} if valid. */
+    private static String positionalError(String arg, String currentPath) {
+        if (arg.startsWith("-")) {
+            return "error: unknown option [" + arg + "]";
+        }
+        if (currentPath != null) {
+            return "error: unexpected extra argument [" + arg + "]";
+        }
+        return null;
+    }
+
+    private static int dispatch(PrintStream out, Options options, String[] labels, GraphInput input) {
+        if (options.repair()) {
             DecomposabilityReport report = DecomposabilityDiagnostic.analyze(input);
-            if (json) {
+            if (options.json()) {
                 out.println(JsonExporter.toJson(report));
             } else {
-                printRepair(out, path, threshold, parsed.labels(), report);
+                printRepair(out, options.path(), options.threshold(), labels, report);
             }
             return 0;
         }
-
         AnalysisResult result = ComparabilityAnalyzer.analyze(input);
-        if (json) {
+        if (options.json()) {
             out.println(JsonExporter.toJson(result));
         } else {
-            printSummary(out, path, threshold, parsed.labels(), result);
+            printSummary(out, options.path(), options.threshold(), labels, result);
         }
         return 0;
     }

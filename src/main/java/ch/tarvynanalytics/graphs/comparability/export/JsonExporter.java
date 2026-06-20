@@ -90,8 +90,7 @@ public final class JsonExporter {
             }
             EdgeView e = report.weakestLinksToRemove().get(i);
             double corr = report.removedCorrelations().get(i);
-            sb.append("{\"source\":").append(e.source()).append(",\"target\":").append(e.target())
-                    .append(",\"correlation\":");
+            edgeRef(sb, e.source(), e.target()).append(",\"correlation\":");
             if (Double.isFinite(corr)) {
                 sb.append(corr);
             } else {
@@ -115,9 +114,14 @@ public final class JsonExporter {
                 sb.append(',');
             }
             EdgeView e = c.fillInEdges().get(i);
-            sb.append("{\"source\":").append(e.source()).append(",\"target\":").append(e.target()).append('}');
+            edgeRef(sb, e.source(), e.target()).append('}');
         }
         sb.append("]}");
+    }
+
+    /** Appends {@code {"source":S,"target":T} without the closing brace, for the caller to finish. */
+    private static StringBuilder edgeRef(StringBuilder sb, int source, int target) {
+        return sb.append("{\"source\":").append(source).append(",\"target\":").append(target);
     }
 
     private static void level(StringBuilder sb, FactorGraphLevelView level) {
@@ -162,7 +166,7 @@ public final class JsonExporter {
                 sb.append(',');
             }
             EdgeView e = g.edges().get(i);
-            sb.append("{\"source\":").append(e.source()).append(",\"target\":").append(e.target()).append('}');
+            edgeRef(sb, e.source(), e.target()).append('}');
         }
         sb.append("]}");
     }
@@ -185,8 +189,8 @@ public final class JsonExporter {
         } else {
             sb.append("null");
         }
-        sb.append(",\"weakestEdge\":{\"source\":").append(f.weakestEdgeSource())
-                .append(",\"target\":").append(f.weakestEdgeTarget()).append('}');
+        sb.append(",\"weakestEdge\":");
+        edgeRef(sb, f.weakestEdgeSource(), f.weakestEdgeTarget()).append('}');
         sb.append('}');
     }
 

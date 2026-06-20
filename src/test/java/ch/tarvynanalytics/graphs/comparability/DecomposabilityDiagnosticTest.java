@@ -64,7 +64,7 @@ class DecomposabilityDiagnosticTest {
             working[e.source()][e.target()] = false;
             working[e.target()][e.source()] = false;
         }
-        return Chordality.holeOrNull(working) == null;
+        return Chordality.holeOrEmpty(working).length == 0;
     }
 
     @Test

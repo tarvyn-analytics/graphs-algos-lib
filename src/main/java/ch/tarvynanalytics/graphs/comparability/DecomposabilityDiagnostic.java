@@ -48,6 +48,36 @@ public final class DecomposabilityDiagnostic {
         if (input == null) {
             throw new IllegalArgumentException("input must not be null");
         }
+        boolean[][] adj = buildAdjacency(input);
+        int fillInAlternative = Chordality.analyze(adj).fillIn.length;
+
+        boolean[][] working = new boolean[adj.length][];
+        for (int i = 0; i < adj.length; i++) {
+            working[i] = adj[i].clone();
+        }
+        List<EdgeView> removed = new ArrayList<>();
+        List<Double> removedCorrelations = new ArrayList<>();
+        double heaviest = Double.NaN;
+
+        for (int[] hole = Chordality.holeOrEmpty(working);
+             hole.length > 0;
+             hole = Chordality.holeOrEmpty(working)) {
+            int[] weakest = weakestEdgeOnCycle(input, hole);
+            int a = weakest[0];
+            int b = weakest[1];
+            working[a][b] = false;
+            working[b][a] = false;
+            removed.add(new EdgeView(Math.min(a, b), Math.max(a, b)));
+            double corr = input.hasCorrelation() ? input.correlation(a, b) : Double.NaN;
+            removedCorrelations.add(corr);
+            heaviest = updateHeaviest(heaviest, input, corr);
+        }
+
+        return new DecomposabilityReport(removed.isEmpty(), removed, removedCorrelations,
+                heaviest, fillInAlternative);
+    }
+
+    private static boolean[][] buildAdjacency(GraphInput input) {
         int n = input.order();
         boolean[][] adj = new boolean[n][n];
         for (int i = 0; i < n; i++) {
@@ -57,34 +87,16 @@ public final class DecomposabilityDiagnostic {
                 }
             }
         }
+        return adj;
+    }
 
-        int fillInAlternative = Chordality.analyze(adj).fillIn.length;
-
-        boolean[][] working = new boolean[n][n];
-        for (int i = 0; i < n; i++) {
-            working[i] = adj[i].clone();
+    /** The running heaviest removed magnitude, updated for one removal (unchanged for adjacency input). */
+    private static double updateHeaviest(double heaviest, GraphInput input, double corr) {
+        if (!input.hasCorrelation()) {
+            return heaviest;
         }
-        List<EdgeView> removed = new ArrayList<>();
-        List<Double> removedCorrelations = new ArrayList<>();
-        double heaviest = Double.NaN;
-
-        int[] hole;
-        while ((hole = Chordality.holeOrNull(working)) != null) {
-            int[] weakest = weakestEdgeOnCycle(input, hole);
-            int a = weakest[0];
-            int b = weakest[1];
-            working[a][b] = false;
-            working[b][a] = false;
-            removed.add(new EdgeView(Math.min(a, b), Math.max(a, b)));
-            double corr = input.hasCorrelation() ? input.correlation(a, b) : Double.NaN;
-            removedCorrelations.add(corr);
-            if (input.hasCorrelation() && (Double.isNaN(heaviest) || Math.abs(corr) > heaviest)) {
-                heaviest = Math.abs(corr);
-            }
-        }
-
-        boolean decomposable = removed.isEmpty();
-        return new DecomposabilityReport(decomposable, removed, removedCorrelations, heaviest, fillInAlternative);
+        double mag = Math.abs(corr);
+        return Double.isNaN(heaviest) ? mag : Math.max(heaviest, mag);
     }
 
     /**

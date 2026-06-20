@@ -69,20 +69,20 @@ final class Chordality {
     }
 
     /**
-     * A chordless cycle (hole) of length &ge; 4 if {@code adj} is not chordal, otherwise {@code null}.
-     * Detection only (no completion) — the cheap primitive for callers that repeatedly test a mutating
-     * graph (e.g. the weakest-link decomposability repair).
+     * A chordless cycle (hole) of length &ge; 4 if {@code adj} is not chordal, otherwise an empty
+     * array. Detection only (no completion) — the cheap primitive for callers that repeatedly test a
+     * mutating graph (e.g. the weakest-link decomposability repair).
      *
      * @param adj the adjacency matrix
-     * @return a hole, or {@code null} if the graph is chordal
+     * @return a hole, or an empty array if the graph is chordal
      */
-    static int[] holeOrNull(boolean[][] adj) {
+    static int[] holeOrEmpty(boolean[][] adj) {
         if (adj.length == 0) {
-            return null;
+            return new int[0];
         }
         Chordality c = new Chordality(adj);
         int[] peo = c.perfectEliminationCandidate();
-        return c.isPerfectEliminationOrder(peo) ? null : c.findHole();
+        return c.isPerfectEliminationOrder(peo) ? new int[0] : c.findHole();
     }
 
     Result analyze() {
