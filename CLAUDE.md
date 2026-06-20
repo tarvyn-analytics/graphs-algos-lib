@@ -45,8 +45,9 @@ library — there is no application to run; the tests are the executable spec.
    working state across the API.
 4. **Implementations are package-private.** Public surface is only the entry
    points (`ComparabilityAnalyzer`, `BatchAnalyzer`, `DecomposabilityDiagnostic`,
-   `StructuralBalanceAnalyzer`, `cli.ComparabilityCli`), `GraphInput`, the `model`
-   records, the `export` serializers and the exceptions.
+   `StructuralBalanceAnalyzer`, `CrossEstimatorAnalyzer`, `cli.ComparabilityCli`),
+   the inputs (`GraphInput`, `EstimatorMatrix`), the `model` records, the `export`
+   serializers and the exceptions.
    Keep it that way — e.g. the CLI's `CorrelationCsv` reader stays package-private,
    and the engine (`ForcingRelation`, `ModularDecomposition`, `Chordality`,
    `ResultBuilder`) is never exported.
@@ -109,6 +110,20 @@ trivially balanced). Public via `StructuralBalanceAnalyzer` (opt-in, like the
 decomposability diagnostic — the main result is sign-agnostic) and the CLI
 `--balance` flag. Oracle: `StructuralBalanceTest` over all signed graphs n ≤ 5
 (balanced iff a satisfying 2-colouring exists; witness is an odd-negative cycle).
+
+`CrossEstimatorAnalyzer` (public entry point, roadmap P2) compares several named
+correlation matrices (`EstimatorMatrix`) of the *same* variables — the
+productionized form of the ad-hoc cross-estimator analysis in
+`results/sp500-investigation-report.md` §C. Estimators are matched on
+**selectivity** (each contributes its top-K strongest edges by magnitude, since
+marginal estimators live on different scales), then it reports the pairwise top-K
+**Jaccard** overlap, the **stable core** (edges in every estimator's top-K) and the
+**estimator-unique** edges (outlier-sensitive links) via `CrossEstimatorReport` /
+`RobustEdge`. This is set algebra, not a graph-property decision, so there is **no
+brute-force oracle**: `CrossEstimatorAnalyzerTest` pins it on hand-computed
+fixtures (and the CLI `--robust` run reproduces every §C number — Jaccard table,
+51-edge gold core, 124 shared by the 3 marginals, 16 Pearson-only). CLI:
+`--robust <csv>... [--top k]`.
 
 ### Add a result field
 

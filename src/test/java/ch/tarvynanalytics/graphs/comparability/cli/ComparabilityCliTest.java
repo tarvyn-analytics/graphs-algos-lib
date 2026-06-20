@@ -58,6 +58,24 @@ class ComparabilityCliTest {
             -0.9,0.9,1.0
             """;
 
+    // Estimator A over w,x,y,z. Top-3 by |corr|: w-x (.9), y-z (.8), w-y (.7); 3 edges above 0.5.
+    private static final String EST_A = """
+            w,x,y,z
+            1.0,0.9,0.7,0.2
+            0.9,1.0,0.1,0.3
+            0.7,0.1,1.0,0.8
+            0.2,0.3,0.8,1.0
+            """;
+
+    // Estimator B over w,x,y,z. Top-3 by |corr|: w-x (.95), y-z (.85), x-z (.6).
+    private static final String EST_B = """
+            w,x,y,z
+            1.0,0.95,0.4,0.3
+            0.95,1.0,0.2,0.6
+            0.4,0.2,1.0,0.85
+            0.3,0.6,0.85,1.0
+            """;
+
     @TempDir
     Path dir;
 
@@ -209,6 +227,83 @@ class ComparabilityCliTest {
         assertTrue(out().startsWith("{"), out());
         assertTrue(out().contains("\"balanced\":false"), out());
         assertTrue(out().contains("\"negativeEdgeCount\":1"), out());
+    }
+
+    @Test
+    void run_RobustTwoEstimators_PrintsJaccardCoreAndUniqueEdges() {
+        int code = run("--robust", csv("a.csv", EST_A).toString(), csv("b.csv", EST_B).toString(), "--top", "3");
+
+        assertEquals(0, code);
+        assertTrue(out().contains("estimators:    2 (a, b)"), out());
+        assertTrue(out().contains("top-K:         3"), out());
+        assertTrue(out().contains("a - b: 0.50"), out());
+        assertTrue(out().contains("stable core (in all 2): 2 edge(s)"), out());
+        assertTrue(out().contains("w - x"), out());
+        assertTrue(out().contains("y - z"), out());
+        assertTrue(out().contains("a (1): w-y"), out());
+        assertTrue(out().contains("b (1): x-z"), out());
+    }
+
+    @Test
+    void run_RobustDefaultTop_DerivesSelectivityFromFirstThreshold() {
+        // No --top: K = first estimator's edge count above |0.5| = 3 (w-x, w-y, y-z).
+        int code = run("--robust", csv("a.csv", EST_A).toString(), csv("b.csv", EST_B).toString());
+
+        assertEquals(0, code);
+        assertTrue(out().contains("top-K:         3"), out());
+        assertTrue(out().contains("matched to |corr| > 0.5 on a"), out());
+    }
+
+    @Test
+    void run_RobustJson_EmitsReportJson() {
+        int code = run("--robust", csv("a.csv", EST_A).toString(), csv("b.csv", EST_B).toString(),
+                "--top", "3", "--json");
+
+        assertEquals(0, code);
+        assertTrue(out().startsWith("{"), out());
+        assertTrue(out().contains("\"topK\":3"), out());
+        assertTrue(out().contains("\"stableCoreSize\":2"), out());
+    }
+
+    @Test
+    void run_RobustWithSinglePath_ReturnsUsageError() {
+        int code = run("--robust", csv("a.csv", EST_A).toString());
+
+        assertEquals(2, code);
+        assertTrue(err().contains("--robust needs at least 2"), err());
+    }
+
+    @Test
+    void run_TopWithoutRobust_ReturnsUsageError() {
+        int code = run(csv("a.csv", EST_A).toString(), "--top", "3");
+
+        assertEquals(2, code);
+        assertTrue(err().contains("--top is only valid with --robust"), err());
+    }
+
+    @Test
+    void run_InvalidTop_ReturnsUsageError() {
+        int code = run("--robust", csv("a.csv", EST_A).toString(), csv("b.csv", EST_B).toString(),
+                "--top", "abc");
+
+        assertEquals(2, code);
+        assertTrue(err().contains("invalid --top value, got [abc]"), err());
+    }
+
+    @Test
+    void run_ConflictingModes_ReturnsUsageError() {
+        int code = run(csv("c5.csv", C5).toString(), "--repair", "--balance");
+
+        assertEquals(2, code);
+        assertTrue(err().contains("choose at most one"), err());
+    }
+
+    @Test
+    void run_RobustMissingFile_ReturnsInputError() {
+        int code = run("--robust", csv("a.csv", EST_A).toString(), dir.resolve("absent.csv").toString());
+
+        assertEquals(1, code);
+        assertTrue(err().contains("cannot read file"), err());
     }
 
     @Test
