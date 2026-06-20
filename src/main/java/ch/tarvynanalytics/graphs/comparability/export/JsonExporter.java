@@ -2,6 +2,7 @@ package ch.tarvynanalytics.graphs.comparability.export;
 
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
 import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
+import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
 import ch.tarvynanalytics.graphs.comparability.model.FactorGraphLevelView;
 import ch.tarvynanalytics.graphs.comparability.model.FailureCycle;
@@ -66,6 +67,41 @@ public final class JsonExporter {
         return sb.toString();
     }
 
+    /**
+     * Serializes a {@link DecomposabilityReport} (the weakest-link deletion repair) to JSON.
+     *
+     * @param report the decomposability diagnostic
+     * @return the report as a JSON document
+     */
+    public static String toJson(DecomposabilityReport report) {
+        StringBuilder sb = new StringBuilder(128);
+        sb.append("{\"decomposable\":").append(report.decomposable());
+        sb.append(",\"suggestedThreshold\":");
+        if (Double.isFinite(report.suggestedThreshold())) {
+            sb.append(report.suggestedThreshold());
+        } else {
+            sb.append("null");
+        }
+        sb.append(",\"fillInAlternative\":").append(report.fillInAlternative());
+        sb.append(",\"weakestLinksToRemove\":[");
+        for (int i = 0; i < report.weakestLinksToRemove().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            EdgeView e = report.weakestLinksToRemove().get(i);
+            double corr = report.removedCorrelations().get(i);
+            edgeRef(sb, e.source(), e.target()).append(",\"correlation\":");
+            if (Double.isFinite(corr)) {
+                sb.append(corr);
+            } else {
+                sb.append("null");
+            }
+            sb.append('}');
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
     private static void chordality(StringBuilder sb, ChordalityView c) {
         sb.append("{\"chordal\":").append(c.chordal());
         sb.append(",\"perfectEliminationOrder\":");
@@ -78,9 +114,14 @@ public final class JsonExporter {
                 sb.append(',');
             }
             EdgeView e = c.fillInEdges().get(i);
-            sb.append("{\"source\":").append(e.source()).append(",\"target\":").append(e.target()).append('}');
+            edgeRef(sb, e.source(), e.target()).append('}');
         }
         sb.append("]}");
+    }
+
+    /** Appends {@code {"source":S,"target":T} without the closing brace, for the caller to finish. */
+    private static StringBuilder edgeRef(StringBuilder sb, int source, int target) {
+        return sb.append("{\"source\":").append(source).append(",\"target\":").append(target);
     }
 
     private static void level(StringBuilder sb, FactorGraphLevelView level) {
@@ -125,7 +166,7 @@ public final class JsonExporter {
                 sb.append(',');
             }
             EdgeView e = g.edges().get(i);
-            sb.append("{\"source\":").append(e.source()).append(",\"target\":").append(e.target()).append('}');
+            edgeRef(sb, e.source(), e.target()).append('}');
         }
         sb.append("]}");
     }
@@ -148,8 +189,8 @@ public final class JsonExporter {
         } else {
             sb.append("null");
         }
-        sb.append(",\"weakestEdge\":{\"source\":").append(f.weakestEdgeSource())
-                .append(",\"target\":").append(f.weakestEdgeTarget()).append('}');
+        sb.append(",\"weakestEdge\":");
+        edgeRef(sb, f.weakestEdgeSource(), f.weakestEdgeTarget()).append('}');
         sb.append('}');
     }
 

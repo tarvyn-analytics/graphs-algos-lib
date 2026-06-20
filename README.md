@@ -136,6 +136,29 @@ Note comparability and chordality are independent: `C₄` is comparability but n
 chordal, the `3-sun` is chordal but not comparability, `K₄` is both and `C₅` is
 neither.
 
+### Weakest-link repair (`DecomposabilityDiagnostic`)
+
+`ChordalityView.fillInEdges()` repairs decomposability by *adding* edges. The
+complementary repair — *removing* the weakest links that frustrate it — is
+`DecomposabilityDiagnostic`, the decomposability-targeted form of the thesis
+"weakest-edge-first" idea:
+
+```java
+DecomposabilityReport r = DecomposabilityDiagnostic.analyze(
+        GraphInput.fromCorrelation(matrix, 0.18));
+if (!r.isDecomposable()) {
+    System.out.println("drop " + r.removalCount() + " link(s) to decompose");
+    System.out.println("heaviest such link |corr| = " + r.suggestedThreshold());
+    System.out.println("(or add " + r.fillInAlternative() + " fill-in edge(s) instead)");
+}
+```
+
+While the graph has a chordless cycle, the weakest edge on it (smallest
+`|correlation|`) is removed, until the graph is chordal. The removed set names
+exactly which weak dependencies frustrate a decomposable (junction-tree) model.
+It is greedy (minimum edge deletion to chordal is NP-hard, so the set is not
+guaranteed minimum) but always terminates and is a principled diagnostic.
+
 ## Storing / exporting the result
 
 The result is a plain object — keep it, or serialize it with the built-in,
@@ -216,8 +239,10 @@ When the graph is not chordal the CLI prints `chordal: NO` instead, with the
 chordless cycle and the number of fill-in edges its chordal completion adds.
 
 An edge is created for every pair with `|correlation| > |threshold|`
-(`--threshold` / `-t`, default `0.5`). `--json` emits the full `AnalysisResult`
-as JSON (the `JsonExporter` shape); `--help` shows usage. Exit codes are
+(`--threshold` / `-t`, default `0.5`). `--json` emits the result as JSON (the
+`JsonExporter` shape); `--repair` switches to the decomposability diagnostic —
+the weakest links to remove to make the graph chordal (with `--json`, the
+`DecomposabilityReport` JSON); `--help` shows usage. Exit codes are
 **result-only**: `0` when the analysis ran (whatever the verdict), `2` for a
 usage error, `1` for an input/IO error — read the verdict from the output, not
 the exit code.
@@ -228,6 +253,7 @@ the exit code.
 ch.tarvynanalytics.graphs.comparability
   ComparabilityAnalyzer   – entry point: analyze(GraphInput) -> AnalysisResult
   BatchAnalyzer           – run many analyses / threshold sweeps, optionally parallel
+  DecomposabilityDiagnostic – weakest-link repair to a chordal (decomposable) graph
   GraphInput              – build the graph from a correlation or adjacency matrix
   (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
                             ModularDecomposition (count + factor-graph levels),
@@ -238,7 +264,7 @@ ch.tarvynanalytics.graphs.comparability
   .model                  – immutable result types (records):
                             AnalysisResult, GraphView, NodeView, EdgeView,
                             FactorGraphLevelView, ModuleView, ModuleType,
-                            FailureCycle, ChordalityView
+                            FailureCycle, ChordalityView, DecomposabilityReport
   .export                 – JsonExporter, DotExporter (zero-dependency serializers)
   .exception              – ComparabilityException, InvalidInputException
 ```

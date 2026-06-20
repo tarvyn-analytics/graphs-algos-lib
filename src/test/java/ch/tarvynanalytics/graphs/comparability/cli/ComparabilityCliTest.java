@@ -138,6 +138,34 @@ class ComparabilityCliTest {
     }
 
     @Test
+    void run_RepairOnNonChordal_PrintsWeakestLinksToRemove() {
+        int code = run(csv("c5.csv", C5).toString(), "--repair");
+
+        assertEquals(0, code);
+        assertTrue(out().contains("decomposable:  NO"), out());
+        assertTrue(out().contains("weakest links to remove (1)"), out());
+        assertTrue(out().contains("fill-in alternative: 2 edge(s)"), out());
+    }
+
+    @Test
+    void run_RepairOnChordal_ReportsAlreadyDecomposable() {
+        int code = run(csv("k3.csv", TRIANGLE).toString(), "--repair");
+
+        assertEquals(0, code);
+        assertTrue(out().contains("decomposable:  YES (already chordal)"), out());
+    }
+
+    @Test
+    void run_RepairJson_EmitsReportJson() {
+        int code = run(csv("c5.csv", C5).toString(), "--repair", "--json");
+
+        assertEquals(0, code);
+        assertTrue(out().startsWith("{"), out());
+        assertTrue(out().contains("\"decomposable\":false"), out());
+        assertTrue(out().contains("\"weakestLinksToRemove\":["), out());
+    }
+
+    @Test
     void run_MissingFile_ReturnsInputError() {
         int code = run(dir.resolve("absent.csv").toString());
 

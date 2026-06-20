@@ -1,8 +1,10 @@
 package ch.tarvynanalytics.graphs.comparability.export;
 
 import ch.tarvynanalytics.graphs.comparability.ComparabilityAnalyzer;
+import ch.tarvynanalytics.graphs.comparability.DecomposabilityDiagnostic;
 import ch.tarvynanalytics.graphs.comparability.GraphInput;
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
+import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -100,6 +102,33 @@ class JsonExporterTest {
                 GraphInput.fromAdjacency(new boolean[1][1], new String[]{"a\"b\\c"}));
         String json = JsonExporter.toJson(r);
         assertTrue(json.contains("\"label\":\"a\\\"b\\\\c\""));
+    }
+
+    @Test
+    void decomposabilityReport_SerializesRemovalsAndThreshold() {
+        AnalysisResult ignored = ComparabilityAnalyzer.analyze(GraphInput.fromCorrelation(correlationCycle5(), 0.5));
+        assertFalse(ignored.chordality().isChordal()); // C5 is a hole
+        DecomposabilityReport report = DecomposabilityDiagnostic.analyze(
+                GraphInput.fromCorrelation(correlationCycle5(), 0.5));
+        String json = JsonExporter.toJson(report);
+
+        assertTrue(json.contains("\"decomposable\":false"), json);
+        assertTrue(json.contains("\"fillInAlternative\":2"), json);
+        assertTrue(json.contains("\"suggestedThreshold\":0.55"), json);
+        assertTrue(json.contains("\"weakestLinksToRemove\":[{\"source\":0,\"target\":4,\"correlation\":0.55}]"), json);
+        assertBalanced(json);
+    }
+
+    @Test
+    void decomposabilityReport_AlreadyChordal_EmptyRemovalNullThreshold() {
+        double[][] k3 = {{1.0, 0.9, 0.8}, {0.9, 1.0, 0.7}, {0.8, 0.7, 1.0}};
+        DecomposabilityReport report = DecomposabilityDiagnostic.analyze(GraphInput.fromCorrelation(k3, 0.5));
+        String json = JsonExporter.toJson(report);
+
+        assertTrue(json.contains("\"decomposable\":true"), json);
+        assertTrue(json.contains("\"suggestedThreshold\":null"), json);
+        assertTrue(json.contains("\"weakestLinksToRemove\":[]"), json);
+        assertBalanced(json);
     }
 
     private static void assertBalanced(String json) {

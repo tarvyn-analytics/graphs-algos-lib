@@ -44,8 +44,9 @@ library — there is no application to run; the tests are the executable spec.
    plain `boolean[][]` adjacency built from `GraphInput`; never leak internal
    working state across the API.
 4. **Implementations are package-private.** Public surface is only the entry
-   points (`ComparabilityAnalyzer`, `BatchAnalyzer`, `cli.ComparabilityCli`),
-   `GraphInput`, the `model` records, the `export` serializers and the exceptions.
+   points (`ComparabilityAnalyzer`, `BatchAnalyzer`, `DecomposabilityDiagnostic`,
+   `cli.ComparabilityCli`), `GraphInput`, the `model` records, the `export`
+   serializers and the exceptions.
    Keep it that way — e.g. the CLI's `CorrelationCsv` reader stays package-private,
    and the engine (`ForcingRelation`, `ModularDecomposition`, `Chordality`,
    `ResultBuilder`) is never exported.
@@ -90,7 +91,15 @@ recovers a hole on failure and produces a greedy (minimum-degree elimination
 game) chordal completion. Its own oracle is `ChordalityTest` (exhaustive over all
 graphs n ≤ 6: verdict, plus the witness is a real hole and the completion is
 chordal — invariant #2). It is computed for every analysis and surfaced as
-`AnalysisResult.chordality()`.
+`AnalysisResult.chordality()`. `Chordality.holeOrNull` is the cheap detection
+primitive (no completion) for callers that test a mutating graph repeatedly.
+
+`DecomposabilityDiagnostic` (public entry point) is the *deletion* complement of
+the chordal completion: a greedy, weight-aware weakest-edge-first repair that
+removes the weakest link on each chordless cycle (via `Chordality.holeOrNull`)
+until the graph is chordal — the decomposability-targeted form of the thesis
+"weakest-edge-first" idea (roadmap P6). It is opt-in (not on `AnalysisResult`,
+to keep the per-analysis cost bounded) and exposed via the CLI `--repair` flag.
 
 ### Add a result field
 

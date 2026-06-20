@@ -1,11 +1,14 @@
 package ch.tarvynanalytics.graphs.comparability.cli;
 
 import ch.tarvynanalytics.graphs.comparability.ComparabilityAnalyzer;
+import ch.tarvynanalytics.graphs.comparability.DecomposabilityDiagnostic;
 import ch.tarvynanalytics.graphs.comparability.GraphInput;
 import ch.tarvynanalytics.graphs.comparability.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.comparability.export.JsonExporter;
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
 import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
+import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
+import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -17,16 +20,17 @@ import java.util.Locale;
  * (transitive orientability).
  *
  * <pre>{@code
- * java -jar graphs-comparability-lib.jar <csv-path> [--threshold <t>] [--json]
+ * java -jar graphs-comparability-lib.jar <csv-path> [--threshold <t>] [--json] [--repair]
  * }</pre>
  *
  * <p>An undirected edge is created for every pair whose
  * {@code |correlation| > |threshold|} (threshold default {@code 0.5}). The verdict
  * and details are printed to standard output (or the full result as JSON with
- * {@code --json}). Exit codes are <em>result-only</em>: {@code 0} when the
- * analysis ran (whatever the verdict), {@code 2} for a usage error and {@code 1}
- * for an input/IO error; the comparability verdict is read from the output, not
- * the exit code.</p>
+ * {@code --json}). With {@code --repair} the tool instead prints the
+ * decomposability diagnostic — the weakest links to remove to make the graph
+ * chordal. Exit codes are <em>result-only</em>: {@code 0} when the analysis ran
+ * (whatever the verdict), {@code 2} for a usage error and {@code 1} for an
+ * input/IO error; the verdict is read from the output, not the exit code.</p>
  */
 public final class ComparabilityCli {
 
@@ -55,80 +59,161 @@ public final class ComparabilityCli {
      * @return the exit code: {@code 0} success, {@code 2} usage error, {@code 1} input/IO error
      */
     static int run(String[] args, PrintStream out, PrintStream err) {
+        ParseResult parse = parseArgs(args, out, err);
+        if (parse.shouldExit()) {
+            return parse.exitCode();
+        }
+        Options options = parse.options();
+
+        CorrelationCsv.Parsed parsed;
+        try {
+            parsed = CorrelationCsv.read(Path.of(options.path()));
+        } catch (IOException e) {
+            err.println("error: cannot read file [" + options.path() + "]: " + e.getMessage());
+            return 1;
+        } catch (InvalidInputException e) {
+            err.println("error: " + e.getMessage());
+            return 1;
+        }
+
+        GraphInput input;
+        try {
+            input = GraphInput.fromCorrelation(parsed.matrix(), options.threshold(), parsed.labels());
+        } catch (InvalidInputException e) {
+            err.println("error: " + e.getMessage());
+            return 1;
+        }
+
+        return dispatch(out, options, parsed.labels(), input);
+    }
+
+    /** The parsed command-line options. */
+    private record Options(String path, double threshold, boolean json, boolean repair) {
+    }
+
+    /** Either parsed options, or an exit code to return immediately (help / usage error). */
+    private record ParseResult(Options options, int exitCode) {
+        static ParseResult ok(Options options) {
+            return new ParseResult(options, -1);
+        }
+
+        static ParseResult exit(int code) {
+            return new ParseResult(null, code);
+        }
+
+        boolean shouldExit() {
+            return options == null;
+        }
+    }
+
+    private static ParseResult parseArgs(String[] args, PrintStream out, PrintStream err) {
         String path = null;
         double threshold = DEFAULT_THRESHOLD;
         boolean json = false;
-
+        boolean repair = false;
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
                 case "-h", "--help" -> {
                     printUsage(out);
-                    return 0;
+                    return ParseResult.exit(0);
                 }
                 case "--json" -> json = true;
+                case "--repair" -> repair = true;
                 case "-t", "--threshold" -> {
-                    if (i + 1 >= args.length) {
-                        err.println("error: " + arg + " requires a value");
-                        printUsage(err);
-                        return 2;
+                    Double value = parseThreshold(args, i, arg, err);
+                    if (value == null) {
+                        return ParseResult.exit(2);
                     }
-                    String value = args[++i];
-                    try {
-                        threshold = Double.parseDouble(value);
-                    } catch (NumberFormatException e) {
-                        err.println("error: invalid threshold, got [" + value + "]");
-                        return 2;
-                    }
+                    threshold = value;
+                    i++;
                 }
                 default -> {
-                    if (arg.startsWith("-")) {
-                        err.println("error: unknown option [" + arg + "]");
+                    String error = positionalError(arg, path);
+                    if (error != null) {
+                        err.println(error);
                         printUsage(err);
-                        return 2;
-                    }
-                    if (path != null) {
-                        err.println("error: unexpected extra argument [" + arg + "]");
-                        printUsage(err);
-                        return 2;
+                        return ParseResult.exit(2);
                     }
                     path = arg;
                 }
             }
         }
-
         if (path == null) {
             err.println("error: missing <csv-path>");
             printUsage(err);
-            return 2;
+            return ParseResult.exit(2);
         }
+        return ParseResult.ok(new Options(path, threshold, json, repair));
+    }
 
-        CorrelationCsv.Parsed parsed;
+    /** Parses the threshold value following {@code flag} at {@code args[i]}, or {@code null} on error. */
+    private static Double parseThreshold(String[] args, int i, String flag, PrintStream err) {
+        if (i + 1 >= args.length) {
+            err.println("error: " + flag + " requires a value");
+            printUsage(err);
+            return null;
+        }
+        String value = args[i + 1];
         try {
-            parsed = CorrelationCsv.read(Path.of(path));
-        } catch (IOException e) {
-            err.println("error: cannot read file [" + path + "]: " + e.getMessage());
-            return 1;
-        } catch (InvalidInputException e) {
-            err.println("error: " + e.getMessage());
-            return 1;
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            err.println("error: invalid threshold, got [" + value + "]");
+            return null;
         }
+    }
 
-        AnalysisResult result;
-        try {
-            result = ComparabilityAnalyzer.analyze(
-                    GraphInput.fromCorrelation(parsed.matrix(), threshold, parsed.labels()));
-        } catch (InvalidInputException e) {
-            err.println("error: " + e.getMessage());
-            return 1;
+    /** An error message for a positional argument (unknown option / extra path), or {@code null} if valid. */
+    private static String positionalError(String arg, String currentPath) {
+        if (arg.startsWith("-")) {
+            return "error: unknown option [" + arg + "]";
         }
+        if (currentPath != null) {
+            return "error: unexpected extra argument [" + arg + "]";
+        }
+        return null;
+    }
 
-        if (json) {
+    private static int dispatch(PrintStream out, Options options, String[] labels, GraphInput input) {
+        if (options.repair()) {
+            DecomposabilityReport report = DecomposabilityDiagnostic.analyze(input);
+            if (options.json()) {
+                out.println(JsonExporter.toJson(report));
+            } else {
+                printRepair(out, options.path(), options.threshold(), labels, report);
+            }
+            return 0;
+        }
+        AnalysisResult result = ComparabilityAnalyzer.analyze(input);
+        if (options.json()) {
             out.println(JsonExporter.toJson(result));
         } else {
-            printSummary(out, path, threshold, parsed.labels(), result);
+            printSummary(out, options.path(), options.threshold(), labels, result);
         }
         return 0;
+    }
+
+    private static void printRepair(PrintStream out, String path, double threshold,
+                                    String[] labels, DecomposabilityReport report) {
+        out.println("file:          " + path);
+        out.println("threshold:     " + threshold);
+        if (report.isDecomposable()) {
+            out.println("decomposable:  YES (already chordal)");
+            return;
+        }
+        out.println("decomposable:  NO");
+        out.println("weakest links to remove (" + report.removalCount() + "):");
+        for (int i = 0; i < report.removalCount(); i++) {
+            EdgeView e = report.weakestLinksToRemove().get(i);
+            double corr = report.removedCorrelations().get(i);
+            String c = Double.isFinite(corr) ? String.format(Locale.ROOT, "%.4f", corr) : "n/a";
+            out.println("  " + labels[e.source()] + " - " + labels[e.target()] + " (correlation " + c + ")");
+        }
+        if (Double.isFinite(report.suggestedThreshold())) {
+            out.println("suggested threshold: " + String.format(Locale.ROOT, "%.4f", report.suggestedThreshold())
+                    + " (drop links at or below it)");
+        }
+        out.println("fill-in alternative: " + report.fillInAlternative() + " edge(s) (add instead of remove)");
     }
 
     private static void printSummary(PrintStream out, String path, double threshold,
@@ -172,16 +257,18 @@ public final class ComparabilityCli {
     }
 
     private static void printUsage(PrintStream s) {
-        s.println("Usage: comparability <csv-path> [--threshold <t>] [--json]");
+        s.println("Usage: comparability <csv-path> [--threshold <t>] [--json] [--repair]");
         s.println();
         s.println("  Reads a correlation-matrix CSV (optional header row of labels, then n");
         s.println("  rows of n comma-separated values) and reports whether the graph whose");
         s.println("  edges are the pairs with |correlation| > |threshold| is a comparability");
-        s.println("  graph (transitively orientable).");
+        s.println("  graph (transitively orientable) and whether it is chordal (decomposable).");
         s.println();
         s.println("  <csv-path>            path to the correlation-matrix CSV");
         s.println("  -t, --threshold <t>   edge threshold magnitude (default 0.5)");
-        s.println("      --json            emit the full analysis result as JSON");
+        s.println("      --json            emit the result as JSON");
+        s.println("      --repair          instead print the decomposability diagnostic:");
+        s.println("                        the weakest links to remove to make it chordal");
         s.println("  -h, --help            show this help");
     }
 }
