@@ -45,8 +45,8 @@ library — there is no application to run; the tests are the executable spec.
    working state across the API.
 4. **Implementations are package-private.** Public surface is only the entry
    points (`ComparabilityAnalyzer`, `BatchAnalyzer`, `DecomposabilityDiagnostic`,
-   `cli.ComparabilityCli`), `GraphInput`, the `model` records, the `export`
-   serializers and the exceptions.
+   `StructuralBalanceAnalyzer`, `cli.ComparabilityCli`), `GraphInput`, the `model`
+   records, the `export` serializers and the exceptions.
    Keep it that way — e.g. the CLI's `CorrelationCsv` reader stays package-private,
    and the engine (`ForcingRelation`, `ModularDecomposition`, `Chordality`,
    `ResultBuilder`) is never exported.
@@ -96,10 +96,19 @@ primitive (no completion) for callers that test a mutating graph repeatedly.
 
 `DecomposabilityDiagnostic` (public entry point) is the *deletion* complement of
 the chordal completion: a greedy, weight-aware weakest-edge-first repair that
-removes the weakest link on each chordless cycle (via `Chordality.holeOrNull`)
+removes the weakest link on each chordless cycle (via `Chordality.holeOrEmpty`)
 until the graph is chordal — the decomposability-targeted form of the thesis
 "weakest-edge-first" idea (roadmap P6). It is opt-in (not on `AnalysisResult`,
 to keep the per-analysis cost bounded) and exposed via the CLI `--repair` flag.
+
+`StructuralBalance` decides signed-graph **balance** (Heider/Harary, roadmap P8):
+a signed BFS 2-colouring (positive edge keeps the camp, negative flips it), with
+the conflict recovered as an odd-negative cycle. The edge sign is the sign of the
+correlation, so it needs correlation input (adjacency input is sign-free, hence
+trivially balanced). Public via `StructuralBalanceAnalyzer` (opt-in, like the
+decomposability diagnostic — the main result is sign-agnostic) and the CLI
+`--balance` flag. Oracle: `StructuralBalanceTest` over all signed graphs n ≤ 5
+(balanced iff a satisfying 2-colouring exists; witness is an odd-negative cycle).
 
 ### Add a result field
 

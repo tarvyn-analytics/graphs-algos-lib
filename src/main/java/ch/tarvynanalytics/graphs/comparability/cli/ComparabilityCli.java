@@ -3,16 +3,19 @@ package ch.tarvynanalytics.graphs.comparability.cli;
 import ch.tarvynanalytics.graphs.comparability.ComparabilityAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.DecomposabilityDiagnostic;
 import ch.tarvynanalytics.graphs.comparability.GraphInput;
+import ch.tarvynanalytics.graphs.comparability.StructuralBalanceAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.comparability.export.JsonExporter;
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
 import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
 import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
+import ch.tarvynanalytics.graphs.comparability.model.StructuralBalanceView;
 
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -20,17 +23,19 @@ import java.util.Locale;
  * (transitive orientability).
  *
  * <pre>{@code
- * java -jar graphs-comparability-lib.jar <csv-path> [--threshold <t>] [--json] [--repair]
+ * java -jar graphs-comparability-lib.jar <csv-path> [--threshold <t>] [--json] [--repair|--balance]
  * }</pre>
  *
  * <p>An undirected edge is created for every pair whose
  * {@code |correlation| > |threshold|} (threshold default {@code 0.5}). The verdict
  * and details are printed to standard output (or the full result as JSON with
  * {@code --json}). With {@code --repair} the tool instead prints the
- * decomposability diagnostic — the weakest links to remove to make the graph
- * chordal. Exit codes are <em>result-only</em>: {@code 0} when the analysis ran
- * (whatever the verdict), {@code 2} for a usage error and {@code 1} for an
- * input/IO error; the verdict is read from the output, not the exit code.</p>
+ * decomposability diagnostic (the weakest links to remove to make the graph
+ * chordal); with {@code --balance} it prints the signed-graph structural-balance
+ * verdict (the two correlation blocs, or a frustrated cycle). Exit codes are
+ * <em>result-only</em>: {@code 0} when the analysis ran (whatever the verdict),
+ * {@code 2} for a usage error and {@code 1} for an input/IO error; the verdict is
+ * read from the output, not the exit code.</p>
  */
 public final class ComparabilityCli {
 
@@ -88,7 +93,7 @@ public final class ComparabilityCli {
     }
 
     /** The parsed command-line options. */
-    private record Options(String path, double threshold, boolean json, boolean repair) {
+    private record Options(String path, double threshold, boolean json, boolean repair, boolean balance) {
     }
 
     /** Either parsed options, or an exit code to return immediately (help / usage error). */
@@ -111,6 +116,7 @@ public final class ComparabilityCli {
         double threshold = DEFAULT_THRESHOLD;
         boolean json = false;
         boolean repair = false;
+        boolean balance = false;
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
@@ -120,6 +126,7 @@ public final class ComparabilityCli {
                 }
                 case "--json" -> json = true;
                 case "--repair" -> repair = true;
+                case "--balance" -> balance = true;
                 case "-t", "--threshold" -> {
                     Double value = parseThreshold(args, i, arg, err);
                     if (value == null) {
@@ -144,7 +151,7 @@ public final class ComparabilityCli {
             printUsage(err);
             return ParseResult.exit(2);
         }
-        return ParseResult.ok(new Options(path, threshold, json, repair));
+        return ParseResult.ok(new Options(path, threshold, json, repair, balance));
     }
 
     /** Parses the threshold value following {@code flag} at {@code args[i]}, or {@code null} on error. */
@@ -175,6 +182,15 @@ public final class ComparabilityCli {
     }
 
     private static int dispatch(PrintStream out, Options options, String[] labels, GraphInput input) {
+        if (options.balance()) {
+            StructuralBalanceView balance = StructuralBalanceAnalyzer.analyze(input);
+            if (options.json()) {
+                out.println(JsonExporter.toJson(balance));
+            } else {
+                printBalance(out, options.path(), options.threshold(), labels, balance);
+            }
+            return 0;
+        }
         if (options.repair()) {
             DecomposabilityReport report = DecomposabilityDiagnostic.analyze(input);
             if (options.json()) {
@@ -191,6 +207,33 @@ public final class ComparabilityCli {
             printSummary(out, options.path(), options.threshold(), labels, result);
         }
         return 0;
+    }
+
+    private static void printBalance(PrintStream out, String path, double threshold,
+                                     String[] labels, StructuralBalanceView balance) {
+        out.println("file:          " + path);
+        out.println("threshold:     " + threshold);
+        out.println("negative edges: " + balance.negativeEdgeCount());
+        if (balance.isBalanced()) {
+            out.println("balanced:      YES");
+            printCamp(out, "A", balance.verticesInCamp(0), labels);
+            printCamp(out, "B", balance.verticesInCamp(1), labels);
+        } else {
+            out.println("balanced:      NO");
+            out.println("frustrated cycle (length " + balance.frustratedCycle().size() + "): "
+                    + String.join(" - ", balance.frustratedCycleLabels()));
+        }
+    }
+
+    private static void printCamp(PrintStream out, String name, List<Integer> members, String[] labels) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < members.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(labels[members.get(i)]);
+        }
+        out.println("  camp " + name + " (" + members.size() + "): " + sb);
     }
 
     private static void printRepair(PrintStream out, String path, double threshold,
@@ -269,6 +312,8 @@ public final class ComparabilityCli {
         s.println("      --json            emit the result as JSON");
         s.println("      --repair          instead print the decomposability diagnostic:");
         s.println("                        the weakest links to remove to make it chordal");
+        s.println("      --balance         instead print the signed-graph structural-balance");
+        s.println("                        verdict: the two correlation blocs, or a frustrated cycle");
         s.println("  -h, --help            show this help");
     }
 }
