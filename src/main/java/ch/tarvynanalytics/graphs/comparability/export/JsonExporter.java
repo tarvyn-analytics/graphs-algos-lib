@@ -2,6 +2,7 @@ package ch.tarvynanalytics.graphs.comparability.export;
 
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
 import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
+import ch.tarvynanalytics.graphs.comparability.model.CrossEstimatorReport;
 import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
 import ch.tarvynanalytics.graphs.comparability.model.FactorGraphLevelView;
@@ -9,6 +10,7 @@ import ch.tarvynanalytics.graphs.comparability.model.FailureCycle;
 import ch.tarvynanalytics.graphs.comparability.model.GraphView;
 import ch.tarvynanalytics.graphs.comparability.model.ModuleView;
 import ch.tarvynanalytics.graphs.comparability.model.NodeView;
+import ch.tarvynanalytics.graphs.comparability.model.RobustEdge;
 import ch.tarvynanalytics.graphs.comparability.model.StructuralBalanceView;
 
 /**
@@ -118,6 +120,61 @@ public final class JsonExporter {
             edgeRef(sb, e.source(), e.target()).append('}');
         }
         sb.append("]}");
+    }
+
+    /**
+     * Serializes a {@link CrossEstimatorReport} (the cross-estimator robustness comparison) to JSON.
+     *
+     * @param report the cross-estimator report
+     * @return the report as a JSON document
+     */
+    public static String toJson(CrossEstimatorReport report) {
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("{\"topK\":").append(report.topK());
+        sb.append(",\"stableCoreSize\":").append(report.stableCore().size());
+        sb.append(",\"estimatorNames\":[");
+        for (int i = 0; i < report.estimatorNames().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            string(sb, report.estimatorNames().get(i));
+        }
+        sb.append("],\"jaccard\":[");
+        for (int i = 0; i < report.jaccard().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append('[');
+            java.util.List<Double> row = report.jaccard().get(i);
+            for (int j = 0; j < row.size(); j++) {
+                if (j > 0) {
+                    sb.append(',');
+                }
+                sb.append(row.get(j).doubleValue());
+            }
+            sb.append(']');
+        }
+        sb.append("],\"edges\":[");
+        for (int i = 0; i < report.edges().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            robustEdge(sb, report.edges().get(i));
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private static void robustEdge(StringBuilder sb, RobustEdge e) {
+        edgeRef(sb, e.source(), e.target());
+        sb.append(",\"sourceLabel\":");
+        string(sb, e.sourceLabel());
+        sb.append(",\"targetLabel\":");
+        string(sb, e.targetLabel());
+        sb.append(",\"support\":").append(e.support());
+        sb.append(",\"estimatorIndices\":");
+        ints(sb, e.estimatorIndices());
+        sb.append('}');
     }
 
     /**

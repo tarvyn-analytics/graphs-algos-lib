@@ -1,22 +1,28 @@
 package ch.tarvynanalytics.graphs.comparability.cli;
 
 import ch.tarvynanalytics.graphs.comparability.ComparabilityAnalyzer;
+import ch.tarvynanalytics.graphs.comparability.CrossEstimatorAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.DecomposabilityDiagnostic;
+import ch.tarvynanalytics.graphs.comparability.EstimatorMatrix;
 import ch.tarvynanalytics.graphs.comparability.GraphInput;
 import ch.tarvynanalytics.graphs.comparability.StructuralBalanceAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.comparability.export.JsonExporter;
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
 import ch.tarvynanalytics.graphs.comparability.model.ChordalityView;
+import ch.tarvynanalytics.graphs.comparability.model.CrossEstimatorReport;
 import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
 import ch.tarvynanalytics.graphs.comparability.model.EdgeView;
+import ch.tarvynanalytics.graphs.comparability.model.RobustEdge;
 import ch.tarvynanalytics.graphs.comparability.model.StructuralBalanceView;
 
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.StringJoiner;
 
 /**
  * Command-line entry point: analyse a correlation-matrix CSV for comparability
@@ -24,6 +30,7 @@ import java.util.Locale;
  *
  * <pre>{@code
  * java -jar graphs-comparability-lib.jar <csv-path> [--threshold <t>] [--json] [--repair|--balance]
+ * java -jar graphs-comparability-lib.jar --robust <csv-path>... [--top <k>] [--threshold <t>] [--json]
  * }</pre>
  *
  * <p>An undirected edge is created for every pair whose
@@ -32,7 +39,9 @@ import java.util.Locale;
  * {@code --json}). With {@code --repair} the tool instead prints the
  * decomposability diagnostic (the weakest links to remove to make the graph
  * chordal); with {@code --balance} it prints the signed-graph structural-balance
- * verdict (the two correlation blocs, or a frustrated cycle). Exit codes are
+ * verdict (the two correlation blocs, or a frustrated cycle); with {@code --robust}
+ * it compares several estimator CSVs over the same variables (top-K Jaccard overlap,
+ * the stable core and the estimator-unique edges). Exit codes are
  * <em>result-only</em>: {@code 0} when the analysis ran (whatever the verdict),
  * {@code 2} for a usage error and {@code 1} for an input/IO error; the verdict is
  * read from the output, not the exit code.</p>
@@ -70,6 +79,10 @@ public final class ComparabilityCli {
         }
         Options options = parse.options();
 
+        if (options.robust()) {
+            return runRobust(out, err, options);
+        }
+
         CorrelationCsv.Parsed parsed;
         try {
             parsed = CorrelationCsv.read(Path.of(options.path()));
@@ -93,7 +106,12 @@ public final class ComparabilityCli {
     }
 
     /** The parsed command-line options. */
-    private record Options(String path, double threshold, boolean json, boolean repair, boolean balance) {
+    private record Options(List<String> paths, double threshold, Integer top,
+                           boolean json, boolean repair, boolean balance, boolean robust) {
+        /** The single CSV path of the non-robust modes. */
+        String path() {
+            return paths.get(0);
+        }
     }
 
     /** Either parsed options, or an exit code to return immediately (help / usage error). */
@@ -112,11 +130,13 @@ public final class ComparabilityCli {
     }
 
     private static ParseResult parseArgs(String[] args, PrintStream out, PrintStream err) {
-        String path = null;
+        List<String> paths = new ArrayList<>();
         double threshold = DEFAULT_THRESHOLD;
+        Integer top = null;
         boolean json = false;
         boolean repair = false;
         boolean balance = false;
+        boolean robust = false;
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
@@ -127,35 +147,71 @@ public final class ComparabilityCli {
                 case "--json" -> json = true;
                 case "--repair" -> repair = true;
                 case "--balance" -> balance = true;
+                case "--robust" -> robust = true;
                 case "-t", "--threshold" -> {
-                    Double value = parseThreshold(args, i, arg, err);
+                    Double value = parseDoubleArg(args, i, arg, err);
                     if (value == null) {
                         return ParseResult.exit(2);
                     }
                     threshold = value;
                     i++;
                 }
+                case "--top" -> {
+                    Integer value = parseIntArg(args, i, arg, err);
+                    if (value == null) {
+                        return ParseResult.exit(2);
+                    }
+                    top = value;
+                    i++;
+                }
                 default -> {
-                    String error = positionalError(arg, path);
-                    if (error != null) {
-                        err.println(error);
+                    if (arg.startsWith("-")) {
+                        err.println("error: unknown option [" + arg + "]");
                         printUsage(err);
                         return ParseResult.exit(2);
                     }
-                    path = arg;
+                    paths.add(arg);
                 }
             }
         }
-        if (path == null) {
-            err.println("error: missing <csv-path>");
+        return validate(new Options(paths, threshold, top, json, repair, balance, robust), err);
+    }
+
+    /** Cross-option validation: arity per mode and mutually exclusive modes. */
+    private static ParseResult validate(Options options, PrintStream err) {
+        int modes = (options.repair() ? 1 : 0) + (options.balance() ? 1 : 0) + (options.robust() ? 1 : 0);
+        if (modes > 1) {
+            err.println("error: choose at most one of --repair, --balance, --robust");
             printUsage(err);
             return ParseResult.exit(2);
         }
-        return ParseResult.ok(new Options(path, threshold, json, repair, balance));
+        if (options.top() != null && !options.robust()) {
+            err.println("error: --top is only valid with --robust");
+            printUsage(err);
+            return ParseResult.exit(2);
+        }
+        if (options.paths().isEmpty()) {
+            err.println(options.robust() ? "error: --robust needs at least 2 <csv-path> arguments"
+                    : "error: missing <csv-path>");
+            printUsage(err);
+            return ParseResult.exit(2);
+        }
+        if (options.robust() && options.paths().size() < 2) {
+            err.println("error: --robust needs at least 2 <csv-path> arguments, got ["
+                    + options.paths().size() + "]");
+            printUsage(err);
+            return ParseResult.exit(2);
+        }
+        if (!options.robust() && options.paths().size() > 1) {
+            err.println("error: unexpected extra argument [" + options.paths().get(1) + "]");
+            printUsage(err);
+            return ParseResult.exit(2);
+        }
+        return ParseResult.ok(options);
     }
 
-    /** Parses the threshold value following {@code flag} at {@code args[i]}, or {@code null} on error. */
-    private static Double parseThreshold(String[] args, int i, String flag, PrintStream err) {
+    /** Parses the double value following {@code flag} at {@code args[i]}, or {@code null} on error. */
+    private static Double parseDoubleArg(String[] args, int i, String flag, PrintStream err) {
         if (i + 1 >= args.length) {
             err.println("error: " + flag + " requires a value");
             printUsage(err);
@@ -170,15 +226,20 @@ public final class ComparabilityCli {
         }
     }
 
-    /** An error message for a positional argument (unknown option / extra path), or {@code null} if valid. */
-    private static String positionalError(String arg, String currentPath) {
-        if (arg.startsWith("-")) {
-            return "error: unknown option [" + arg + "]";
+    /** Parses the integer value following {@code flag} at {@code args[i]}, or {@code null} on error. */
+    private static Integer parseIntArg(String[] args, int i, String flag, PrintStream err) {
+        if (i + 1 >= args.length) {
+            err.println("error: " + flag + " requires a value");
+            printUsage(err);
+            return null;
         }
-        if (currentPath != null) {
-            return "error: unexpected extra argument [" + arg + "]";
+        String value = args[i + 1];
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            err.println("error: invalid --top value, got [" + value + "]");
+            return null;
         }
-        return null;
     }
 
     private static int dispatch(PrintStream out, Options options, String[] labels, GraphInput input) {
@@ -207,6 +268,114 @@ public final class ComparabilityCli {
             printSummary(out, options.path(), options.threshold(), labels, result);
         }
         return 0;
+    }
+
+    /** The {@code --robust} mode: compare several estimator CSVs over the same variables. */
+    private static int runRobust(PrintStream out, PrintStream err, Options options) {
+        List<EstimatorMatrix> estimators = new ArrayList<>();
+        String[] labels = null;
+        int referenceEdgeCount = 0;
+        for (int p = 0; p < options.paths().size(); p++) {
+            String path = options.paths().get(p);
+            CorrelationCsv.Parsed parsed;
+            try {
+                parsed = CorrelationCsv.read(Path.of(path));
+            } catch (IOException e) {
+                err.println("error: cannot read file [" + path + "]: " + e.getMessage());
+                return 1;
+            } catch (InvalidInputException e) {
+                err.println("error: " + e.getMessage());
+                return 1;
+            }
+            try {
+                estimators.add(EstimatorMatrix.of(estimatorName(path), parsed.matrix()));
+            } catch (InvalidInputException e) {
+                err.println("error: " + e.getMessage());
+                return 1;
+            }
+            if (p == 0) {
+                labels = parsed.labels();
+                referenceEdgeCount = countEdges(parsed.matrix(), options.threshold());
+            }
+        }
+
+        int topK = options.top() != null ? options.top() : referenceEdgeCount;
+        if (topK < 1) {
+            err.println("error: no edges above |threshold| " + options.threshold()
+                    + " in the first estimator; pass --top <k>");
+            return 1;
+        }
+
+        CrossEstimatorReport report;
+        try {
+            report = CrossEstimatorAnalyzer.analyze(estimators, labels, topK);
+        } catch (InvalidInputException e) {
+            err.println("error: " + e.getMessage());
+            return 1;
+        }
+
+        if (options.json()) {
+            out.println(JsonExporter.toJson(report));
+        } else {
+            printRobust(out, report, options.top() == null, options.threshold());
+        }
+        return 0;
+    }
+
+    /** Counts the undirected edges {@code |m[i][j]| > |threshold|} (the selectivity for the first estimator). */
+    private static int countEdges(double[][] matrix, double threshold) {
+        double cut = Math.abs(threshold);
+        int count = 0;
+        for (int i = 0; i < matrix.length; i++) {
+            for (int j = i + 1; j < matrix.length && j < matrix[i].length; j++) {
+                if (Math.abs(matrix[i][j]) > cut) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /** The estimator name from a CSV path: the file name without its extension. */
+    private static String estimatorName(String path) {
+        String name = Path.of(path).getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    private static void printRobust(PrintStream out, CrossEstimatorReport report,
+                                    boolean derivedTop, double threshold) {
+        out.println("estimators:    " + report.estimatorCount() + " ("
+                + String.join(", ", report.estimatorNames()) + ")");
+        String selectivity = derivedTop
+                ? " (matched to |corr| > " + threshold + " on " + report.estimatorNames().get(0) + ")"
+                : " (selectivity-matched)";
+        out.println("top-K:         " + report.topK() + selectivity);
+
+        out.println("Jaccard overlap (top-K edge sets):");
+        List<String> names = report.estimatorNames();
+        for (int i = 0; i < names.size(); i++) {
+            for (int j = i + 1; j < names.size(); j++) {
+                out.println("  " + names.get(i) + " - " + names.get(j) + ": "
+                        + String.format(Locale.ROOT, "%.2f", report.jaccard(i, j)));
+            }
+        }
+
+        List<RobustEdge> core = report.stableCore();
+        out.println("stable core (in all " + report.estimatorCount() + "): " + core.size() + " edge(s)");
+        for (RobustEdge e : core) {
+            out.println("  " + e.sourceLabel() + " - " + e.targetLabel());
+        }
+
+        out.println("estimator-unique edges (outlier-sensitive):");
+        for (int e = 0; e < names.size(); e++) {
+            List<RobustEdge> unique = report.uniqueTo(e);
+            StringJoiner joiner = new StringJoiner(", ");
+            for (RobustEdge edge : unique) {
+                joiner.add(edge.sourceLabel() + "-" + edge.targetLabel());
+            }
+            out.println("  " + names.get(e) + " (" + unique.size() + "): " + joiner);
+        }
     }
 
     private static void printBalance(PrintStream out, String path, double threshold,
@@ -300,7 +469,8 @@ public final class ComparabilityCli {
     }
 
     private static void printUsage(PrintStream s) {
-        s.println("Usage: comparability <csv-path> [--threshold <t>] [--json] [--repair]");
+        s.println("Usage: comparability <csv-path> [--threshold <t>] [--json] [--repair|--balance]");
+        s.println("       comparability --robust <csv-path>... [--top <k>] [--threshold <t>] [--json]");
         s.println();
         s.println("  Reads a correlation-matrix CSV (optional header row of labels, then n");
         s.println("  rows of n comma-separated values) and reports whether the graph whose");
@@ -314,6 +484,10 @@ public final class ComparabilityCli {
         s.println("                        the weakest links to remove to make it chordal");
         s.println("      --balance         instead print the signed-graph structural-balance");
         s.println("                        verdict: the two correlation blocs, or a frustrated cycle");
+        s.println("      --robust          compare several estimator CSVs over the same variables:");
+        s.println("                        top-K Jaccard overlap, the stable core, unique edges");
+        s.println("      --top <k>         (--robust) strongest edges per estimator; default = the");
+        s.println("                        first estimator's edge count above --threshold");
         s.println("  -h, --help            show this help");
     }
 }

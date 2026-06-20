@@ -1,13 +1,18 @@
 package ch.tarvynanalytics.graphs.comparability.export;
 
 import ch.tarvynanalytics.graphs.comparability.ComparabilityAnalyzer;
+import ch.tarvynanalytics.graphs.comparability.CrossEstimatorAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.DecomposabilityDiagnostic;
+import ch.tarvynanalytics.graphs.comparability.EstimatorMatrix;
 import ch.tarvynanalytics.graphs.comparability.GraphInput;
 import ch.tarvynanalytics.graphs.comparability.StructuralBalanceAnalyzer;
 import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
+import ch.tarvynanalytics.graphs.comparability.model.CrossEstimatorReport;
 import ch.tarvynanalytics.graphs.comparability.model.DecomposabilityReport;
 import ch.tarvynanalytics.graphs.comparability.model.StructuralBalanceView;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -148,6 +153,35 @@ class JsonExporterTest {
         assertTrue(json.contains("\"negativeEdgeCount\":1"), json);
         assertTrue(json.contains("\"camp\":[]"), json);
         assertTrue(json.contains("\"frustratedCycle\":["), json);
+        assertBalanced(json);
+    }
+
+    @Test
+    void crossEstimatorReport_SerializesJaccardCoreAndSupportAnnotatedEdges() {
+        double[][] a = {
+                {1.0, 0.9, 0.7, 0.2},
+                {0.9, 1.0, 0.1, 0.3},
+                {0.7, 0.1, 1.0, 0.8},
+                {0.2, 0.3, 0.8, 1.0}
+        };
+        double[][] b = {
+                {1.0, 0.95, 0.4, 0.3},
+                {0.95, 1.0, 0.2, 0.6},
+                {0.4, 0.2, 1.0, 0.85},
+                {0.3, 0.6, 0.85, 1.0}
+        };
+        CrossEstimatorReport r = CrossEstimatorAnalyzer.analyze(
+                List.of(EstimatorMatrix.of("a", a), EstimatorMatrix.of("b", b)),
+                new String[]{"w", "x", "y", "z"}, 3);
+        String json = JsonExporter.toJson(r);
+
+        assertTrue(json.contains("\"topK\":3"), json);
+        assertTrue(json.contains("\"stableCoreSize\":2"), json);
+        assertTrue(json.contains("\"estimatorNames\":[\"a\",\"b\"]"), json);
+        assertTrue(json.contains("\"jaccard\":[[1.0,0.5],[0.5,1.0]]"), json);
+        // the stable-core edge w-x is in both estimators (support 2, indices [0,1]).
+        assertTrue(json.contains("\"sourceLabel\":\"w\",\"targetLabel\":\"x\",\"support\":2,"
+                + "\"estimatorIndices\":[0,1]"), json);
         assertBalanced(json);
     }
 

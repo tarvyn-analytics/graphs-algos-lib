@@ -184,6 +184,46 @@ main `AnalysisResult` is sign-agnostic. Decided in linear time by a signed BFS
 negative edges. A graph built from a plain boolean adjacency carries no signs
 (every edge positive), so it is trivially balanced.
 
+## Cross-estimator robustness (stable core)
+
+The analyses above look at one matrix. `CrossEstimatorAnalyzer` looks across
+several — Pearson, Spearman, Kendall, partial — and reports **how robust the edge
+structure is to the choice of estimator**: which links every estimator agrees on
+(the stable, trustworthy "gold core") versus which are seen by only one (the
+outlier-sensitive links).
+
+Marginal estimators live on different scales (Kendall's τ is systematically
+smaller than Pearson's r), so a single absolute threshold would not compare like
+with like. Estimators are matched on **selectivity** instead: each contributes its
+top-K strongest edges by magnitude.
+
+```java
+import ch.tarvynanalytics.graphs.comparability.CrossEstimatorAnalyzer;
+import ch.tarvynanalytics.graphs.comparability.EstimatorMatrix;
+import ch.tarvynanalytics.graphs.comparability.model.CrossEstimatorReport;
+
+CrossEstimatorReport r = CrossEstimatorAnalyzer.analyze(
+        List.of(EstimatorMatrix.of("pearson",  pearson),
+                EstimatorMatrix.of("spearman", spearman),
+                EstimatorMatrix.of("kendall",  kendall),
+                EstimatorMatrix.of("partial",  partial)),
+        tickers, 144);                              // top-144 strongest edges each
+
+r.jaccard(0, 1);            // pairwise top-K edge-set overlap (Jaccard), pearson vs spearman
+r.stableCore();             // edges in every estimator's top-K (robust to the estimator choice)
+r.uniqueTo(0);              // edges only pearson's top-K has (outlier-sensitive)
+```
+
+`CrossEstimatorReport` carries the estimator names, the pairwise Jaccard matrix
+and, in `edges()`, every edge that appears in at least one estimator's top-K as a
+`RobustEdge` annotated with its `support()` (how many estimators agree) and the
+estimator indices that contain it — from which `stableCore()` (full support),
+`uniqueEdges()` (support 1) and `uniqueTo(estimator)` are derived. Ties at the
+top-K cut are broken deterministically by endpoint, and `topK` is clamped to the
+number of vertex pairs. This is set algebra over the top-K edge sets, not a
+graph-property decision, so it has no brute-force oracle; it is pinned by
+hand-computed fixtures.
+
 ## Storing / exporting the result
 
 The result is a plain object — keep it, or serialize it with the built-in,
@@ -273,6 +313,32 @@ structural-balance verdict (the two correlation blocs, or a frustrated cycle);
 (whatever the verdict), `2` for a usage error, `1` for an input/IO error — read
 the verdict from the output, not the exit code.
 
+To compare several estimators, pass `--robust` and two or more CSVs over the same
+variables (the estimator name is each file's stem):
+
+```bash
+java -jar target/graphs-comparability-lib-0.1.0-SNAPSHOT.jar --robust \
+    pearson.csv spearman.csv kendall.csv partial.csv --top 144
+```
+
+```
+estimators:    4 (pearson, spearman, kendall, partial)
+top-K:         144 (selectivity-matched)
+Jaccard overlap (top-K edge sets):
+  pearson - spearman: 0.78
+  ...
+stable core (in all 4): 51 edge(s)
+  ADI - MCHP
+  ...
+estimator-unique edges (outlier-sensitive):
+  pearson (16): AEE-EVRG, AEP-CMS, ...
+```
+
+`--top <k>` is the per-estimator selectivity; it defaults to the first
+estimator's edge count above `--threshold` (so `--robust ... --threshold 0.8`
+matches the K to Pearson's 0.8 graph). With `--json` it emits the
+`CrossEstimatorReport` shape.
+
 ## Package layout
 
 ```
@@ -281,7 +347,9 @@ ch.tarvynanalytics.graphs.comparability
   BatchAnalyzer           – run many analyses / threshold sweeps, optionally parallel
   DecomposabilityDiagnostic – weakest-link repair to a chordal (decomposable) graph
   StructuralBalanceAnalyzer – signed-graph structural balance (Heider/Harary)
+  CrossEstimatorAnalyzer  – cross-estimator robustness / stable core (top-K Jaccard)
   GraphInput              – build the graph from a correlation or adjacency matrix
+  EstimatorMatrix         – a named correlation matrix (input to CrossEstimatorAnalyzer)
   (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
                             ModularDecomposition (count + factor-graph levels),
                             Chordality (chordality verdict + PEO / hole / completion),
@@ -293,7 +361,7 @@ ch.tarvynanalytics.graphs.comparability
                             AnalysisResult, GraphView, NodeView, EdgeView,
                             FactorGraphLevelView, ModuleView, ModuleType,
                             FailureCycle, ChordalityView, DecomposabilityReport,
-                            StructuralBalanceView
+                            StructuralBalanceView, CrossEstimatorReport, RobustEdge
   .export                 – JsonExporter, DotExporter (zero-dependency serializers)
   .exception              – ComparabilityException, InvalidInputException
 ```

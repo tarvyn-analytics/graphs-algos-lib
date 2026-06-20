@@ -86,6 +86,34 @@ class ModelTest {
     }
 
     @Test
+    void robustEdge_SupportAndImmutability() {
+        RobustEdge e = new RobustEdge(0, 1, "a", "b", List.of(0, 2));
+        assertEquals(2, e.support());
+        assertEquals(List.of(0, 2), e.estimatorIndices());
+        assertThrows(UnsupportedOperationException.class, () -> e.estimatorIndices().clear());
+    }
+
+    @Test
+    void crossEstimatorReport_AccessorsViewsAndImmutability() {
+        RobustEdge shared = new RobustEdge(0, 1, "a", "b", List.of(0, 1));
+        RobustEdge onlyP = new RobustEdge(0, 2, "a", "c", List.of(0));
+        RobustEdge onlyS = new RobustEdge(1, 2, "b", "c", List.of(1));
+        CrossEstimatorReport r = new CrossEstimatorReport(
+                List.of("pearson", "spearman"), 2,
+                List.of(List.of(1.0, 0.5), List.of(0.5, 1.0)),
+                List.of(shared, onlyP, onlyS));
+
+        assertEquals(2, r.estimatorCount());
+        assertEquals(0.5, r.jaccard(0, 1));
+        assertEquals(List.of(shared), r.stableCore());
+        assertEquals(List.of(onlyP, onlyS), r.uniqueEdges());
+        assertEquals(List.of(onlyP), r.uniqueTo(0));
+        assertEquals(List.of(onlyS), r.uniqueTo(1));
+        assertThrows(UnsupportedOperationException.class, () -> r.edges().clear());
+        assertThrows(UnsupportedOperationException.class, () -> r.jaccard().get(0).clear());
+    }
+
+    @Test
     void records_EqualityAndToString() {
         assertEquals(new NodeView(0, "a"), new NodeView(0, "a"));
         assertNotEquals(new NodeView(0, "a"), new NodeView(1, "a"));
