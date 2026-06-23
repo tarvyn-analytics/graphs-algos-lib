@@ -131,10 +131,13 @@ public final class ChangeDetectors {
      * Nearest-rank percentile (no interpolation), matching the spike's {@code _percentile}:
      * sort ascending, {@code rank = clamp(ceil(pct/100 * n), 1, n)}, return {@code sorted[rank-1]}.
      */
-    private static double nearestRankPercentile(double[] values, double pct) {
+    static double nearestRankPercentile(double[] values, double pct) {
+        int n = values.length;
+        if (n == 0) {
+            return Double.NaN;   // percentile of an empty series is undefined (callers guard against this)
+        }
         double[] sorted = values.clone();
         Arrays.sort(sorted);
-        int n = sorted.length;
         int rank = (int) Math.ceil(pct / 100.0 * n);
         if (rank < 1) {
             rank = 1;

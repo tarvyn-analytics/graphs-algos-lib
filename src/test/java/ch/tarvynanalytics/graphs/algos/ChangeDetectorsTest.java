@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Calibration arithmetic and factory guards (spec §2.1, §2.2). */
 class ChangeDetectorsTest {
@@ -94,5 +95,24 @@ class ChangeDetectorsTest {
     void create_NegativeOrder_Throws() {
         assertThrows(InvalidInputException.class,
                 () -> ChangeDetectors.create(-1, DetectorConfig.crypto(), new Calibration(0.0, 0.1, 0.9)));
+    }
+
+    @Test
+    void nearestRankPercentile_EmptySeries_IsNaN() {
+        assertTrue(Double.isNaN(ChangeDetectors.nearestRankPercentile(new double[0], 90.0)));
+    }
+
+    @Test
+    void nearestRankPercentile_NearestRank_NotInterpolated() {
+        double[] v = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+        assertEquals(9.0, ChangeDetectors.nearestRankPercentile(v, 90.0), 1e-12);
+        assertEquals(10.0, ChangeDetectors.nearestRankPercentile(v, 99.0), 1e-12);
+    }
+
+    @Test
+    void nearestRankPercentile_ClampsRankAtBothEnds() {
+        double[] v = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+        assertEquals(1.0, ChangeDetectors.nearestRankPercentile(v, 0.0), 1e-12);    // ceil(0)=0 -> clamp to 1
+        assertEquals(10.0, ChangeDetectors.nearestRankPercentile(v, 100.0), 1e-12); // ceil(n)=n
     }
 }
