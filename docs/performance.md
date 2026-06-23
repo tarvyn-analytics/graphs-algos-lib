@@ -1,4 +1,4 @@
-# Performance notes (CGD-8 / D3)
+# Performance notes (GAL-8 / D3)
 
 Single-analysis performance of the Golumbic Γ + modular-decomposition engine.
 Reproduce with the committed harness:
@@ -6,14 +6,14 @@ Reproduce with the committed harness:
 ```bash
 ./mvnw test-compile
 java -cp target/classes:target/test-classes \
-  ch.tarvynanalytics.graphs.comparability.Benchmark
+  ch.tarvynanalytics.graphs.algos.Benchmark
 ```
 
 ## Where the time goes
 
 `analyze()` is two phases: the **Γ verdict** (`ForcingRelation`, ~O(m·n)) and the
 **modular decomposition** (`ModularDecomposition`, used for the count and the
-factor-graph levels). A per-phase breakdown on dense random graphs (with the CGD-16
+factor-graph levels). A per-phase breakdown on dense random graphs (with the GAL-16
 size gate active, so n ≥ 50 uses the near-linear builder):
 
 | n   | comparable | Γ verdict | modular levels |
@@ -25,7 +25,7 @@ The modular decomposition is now cheap at every size; the dominant cost on dense
 graphs is the Γ verdict. Historically the modular decomposition's **prime-case**
 handling was the hotspot — `maximalModularPartition` → `minimalModule` fires only
 when a (sub)graph is *prime* (neither disconnected nor co-disconnected), and was
-**O(n⁴)** there (~360 ms at n=100). The CGD-16 near-linear `fracture` builder,
+**O(n⁴)** there (~360 ms at n=100). The GAL-16 near-linear `fracture` builder,
 size-gated in, removes it (see below). Series/parallel structure (all cographs,
 most thresholded correlation networks) was always cheap and skips the prime case
 entirely.
@@ -51,7 +51,7 @@ The realistic paths (threshold sweeps, structured/comparability graphs) are
 comfortably fast at the target sizes (DJIA ≈ 30; correlation networks up to a few
 hundred). Cographs at n=150 stay ~3 ms.
 
-## Near-linear modular decomposition, size-gated (CGD-16)
+## Near-linear modular decomposition, size-gated (GAL-16)
 
 The former **O(n⁴)** prime-case limitation is **resolved**. `ModularDecomposition`
 now has a second builder, `buildTreeLinear()` — a Java port of the `fracture`
@@ -87,7 +87,7 @@ parallelised; batch-level parallelism stays in `BatchAnalyzer` (below). The
 implementation plan and step history are in
 [`docs/linear-md-plan.md`](linear-md-plan.md).
 
-## Parallelism (CGD-9 / D2)
+## Parallelism (GAL-9 / D2)
 
 **Intra-analysis parallelism is not pursued** — the decision, with evidence:
 

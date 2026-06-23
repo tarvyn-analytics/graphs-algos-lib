@@ -1,9 +1,9 @@
 ---
 name: release
-description: Cut a graphs-comparability-lib release — merge develop into main with a true merge commit, publish to GitHub Packages, tag, back-merge, bump the version
+description: Cut a graphs-algos-lib release — merge develop into main with a true merge commit, publish to GitHub Packages, tag, back-merge, bump the version
 ---
 
-# Release Skill — graphs-comparability-lib
+# Release Skill — graphs-algos-lib
 
 GitFlow releases use **true merge commits**, never squash. Squash commits are
 for feature → develop only: a squashed release never advances the
@@ -20,8 +20,8 @@ develop history again.
 
    ```bash
    gh pr create --base main --head develop \
-     --title "release(lib): [CGD-<n>]: release X.Y.Z" \
-     --body "Release merge develop -> main. Publishes graphs-comparability-lib X.Y.Z to GitHub Packages."
+     --title "release(lib): [GAL-<n>]: release X.Y.Z" \
+     --body "Release merge develop -> main. Publishes graphs-algos-lib X.Y.Z to GitHub Packages."
    gh pr checks <pr> --watch
    gh pr merge <pr> --merge --admin   # merge commit, NOT --squash
    ```
@@ -45,19 +45,19 @@ develop history again.
    git checkout develop && git pull --ff-only
    git fetch origin main
    git merge --no-ff -X ours origin/main \
-     -m "chore(lib): [CGD-<n>]: back-merge main after X.Y.Z release"
+     -m "chore(lib): [GAL-<n>]: back-merge main after X.Y.Z release"
    ```
 
    `-X ours` keeps develop's side on conflicts (the pom version line —
    develop moves past the released version in step 5).
 
 5. **Bump develop** to the next `-SNAPSHOT` (edit the pom `<version>`,
-   commit `chore(lib): [CGD-<n>]: bump version to X.Y.(Z+1)-SNAPSHOT`).
+   commit `chore(lib): [GAL-<n>]: bump version to X.Y.(Z+1)-SNAPSHOT`).
    Push steps 4+5 together directly to develop — the branch-protection
    bypass allowance covers maintainer pushes.
 
 6. **Verify**: the develop push publishes the new SNAPSHOT; check
-   `gh api "orgs/tarvyn-analytics/packages/maven/ch.tarvynanalytics.graphs.graphs-comparability-lib/versions" --jq '.[].name'`
+   `gh api "orgs/tarvyn-analytics/packages/maven/ch.tarvynanalytics.graphs.graphs-algos-lib/versions" --jq '.[].name'`
    lists the release and the new SNAPSHOT, and `git ls-remote --tags origin`
    shows `vX.Y.Z`.
 

@@ -56,6 +56,6 @@ jobs:
       - name: Upload library jar
         uses: actions/upload-artifact@v7
         with:
-          name: graphs-comparability-lib
-          path: target/graphs-comparability-lib-*.jar
+          name: graphs-algos-lib
+          path: target/graphs-algos-lib-*.jar
           retention-days: 30

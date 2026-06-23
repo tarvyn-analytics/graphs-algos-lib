@@ -1,6 +1,6 @@
 # Theory review — is Algorithm 2.3.1 a sound & complete comparability test?
 
-*CGD-5 (direction D5). Companion to `NEXT_SESSION.md`. The empirical claims here
+*GAL-5 (direction D5). Companion to `NEXT_SESSION.md`. The empirical claims here
 are reproduced by a brute-force oracle sweep; the throwaway harness used is
 described in §2 and is not committed.*
 
@@ -20,7 +20,7 @@ Algorithm 2.3.1's bespoke chain-folding plus the local "odd-cycle" check, and
 the library's multiplicative orientation count — is an **incomplete and unsound
 search** that happens to be exact on the small/structured graphs the thesis and
 the test-suite exercise. This explains why the library "worked" on its fixtures
-yet misclassifies the 3-sun (see CGD-10).
+yet misclassifies the 3-sun (see GAL-10).
 
 ---
 
@@ -105,7 +105,7 @@ walks is where things break.
 | **Lemmas 2.211–2.214** — Kₙ orientations ⇔ Hamiltonian chains, `\|Γ\| = n!` | **author** | **Correct.** The clique count `n!` is reproduced exactly by the engine for every Kₙ tested (n ≤ 6). |
 | **Lemma 2.210** + **Note** — module orientation is independent of the quotient's | cited (+ author Note) | Existence direction **correct** (corollary: orientable modules + orientable quotient ⇒ orientable G). But independence of *choice* does **not** imply **multiplicativity of counts** over this decomposition — the library over-extended it (§5.4). |
 | **Thm 2.21** — unique decomposition into max-complete + min-stable subgraphs `[5]` | cited | Correct as a *decomposition* theorem; it is **not** the canonical modular-decomposition tree, and using it for counting is unsafe (§5.4). |
-| **Algorithm 2.3.1** — the recursive procedure | **author** | **Incomplete and (as implemented) unsound** as a decision procedure (§5.2–5.3); Step 5's chain construction can also fail to terminate (the 3-sun stack overflow fixed in CGD-10). |
+| **Algorithm 2.3.1** — the recursive procedure | **author** | **Incomplete and (as implemented) unsound** as a decision procedure (§5.2–5.3); Step 5's chain construction can also fail to terminate (the 3-sun stack overflow fixed in GAL-10). |
 
 ---
 
@@ -128,13 +128,13 @@ witness is the **3-sun S₃ (Hajós graph)**:
 ```
 triangle 0-1-2;  outer 3~{0,1}, 4~{1,2}, 5~{0,2}
 oracle: 0 transitive orientations  →  NOT a comparability graph
-engine: comparability = true, count = 2          ← WRONG (see CGD-10)
+engine: comparability = true, count = 2          ← WRONG (see GAL-10)
 ```
 
 S₃ is *prime* (no non-trivial module), so the algorithm tries to cover all its
 edges with one non-triangulable chain and test for an odd cycle. It fails to
 assemble the genuine odd forcing-walk (the cover construction does not terminate;
-after the CGD-10 totality fix it bails and declares success). The search is
+after the GAL-10 totality fix it bails and declares success). The search is
 **incomplete**: a real odd Γ-walk exists (guaranteed by Thm 2.22) but the
 greedy single-chain construction never finds it.
 
@@ -224,7 +224,7 @@ test — a fact future work (D1/D3) must not "optimise" around blindly.
 
 ---
 
-## 7. Families for the correctness suite (hand-off to CGD-6 / D4)
+## 7. Families for the correctness suite (hand-off to GAL-6 / D4)
 
 Confirming (engine matches ground truth — keep as regression fixtures):
 
@@ -235,7 +235,7 @@ Confirming (engine matches ground truth — keep as regression fixtures):
 
 Refuting (engine diverges — use as the divergence oracle / xfail set):
 
-* **3-sun S₃** — false positive (accepted; truly non-comparability). *(CGD-10
+* **3-sun S₃** — false positive (accepted; truly non-comparability). *(GAL-10
   regression already pins termination; flip to `comparability=false` once fixed.)*
 * `{0-1,0-2,0-3,0-4,1-2,1-4,1-5,2-3}` (n = 6) — false **negative** (rejected; truly
   comparability, 2 orientations).

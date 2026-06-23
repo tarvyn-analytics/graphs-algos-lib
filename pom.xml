@@ -3,15 +3,15 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ch.tarvynanalytics.graphs</groupId>
-    <artifactId>graphs-comparability-lib</artifactId>
+    <artifactId>graphs-algos-lib</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>graphs comparability lib</name>
-    <description>Pure Java library that decides whether a graph (built from a thresholded
-        correlation/adjacency matrix) is a comparability graph (transitively orientable),
-        produces the factor-graph (modular) decomposition hierarchy and the count of distinct
-        transitive orientations, or reports the obstructing odd chordless cycle. Analysis only,
-        no GUI; zero runtime dependencies.</description>
+    <name>graphs algos lib</name>
+    <description>Pure Java graph-algorithms library over a thresholded correlation/adjacency
+        matrix: comparability (transitive orientation) detection with modular decomposition and
+        orientation count, chordality detection/completion, decomposability repair, signed-graph
+        structural balance and cross-estimator robustness. Analysis only, no GUI; zero
+        runtime dependencies.</description>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -20,7 +20,7 @@
         <!-- SonarCloud analysis (same organization as the other tarvyn-analytics repos) -->
         <sonar.organization>tarvyn-analytics</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <sonar.projectKey>tarvyn-analytics_graphs-comparability-lib</sonar.projectKey>
+        <sonar.projectKey>tarvyn-analytics_graphs-algos-lib</sonar.projectKey>
         <!-- e1: S5778 expects a single throwing call in a lambda; it does not fit
              JUnit assertThrows where a setup call legitimately precedes the throwing
              one. Exclude it from test sources only.
@@ -44,13 +44,13 @@
     <distributionManagement>
         <repository>
             <id>github</id>
-            <name>GitHub Packages (tarvyn-analytics/graphs-comparability-lib)</name>
-            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-comparability-lib</url>
+            <name>GitHub Packages (tarvyn-analytics/graphs-algos-lib)</name>
+            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-algos-lib</url>
         </repository>
         <snapshotRepository>
             <id>github</id>
-            <name>GitHub Packages (tarvyn-analytics/graphs-comparability-lib)</name>
-            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-comparability-lib</url>
+            <name>GitHub Packages (tarvyn-analytics/graphs-algos-lib)</name>
+            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-algos-lib</url>
         </snapshotRepository>
     </distributionManagement>
 
@@ -102,7 +102,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>ch.tarvynanalytics.graphs.comparability.cli.ComparabilityCli</mainClass>
+                            <mainClass>ch.tarvynanalytics.graphs.algos.cli.ComparabilityCli</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

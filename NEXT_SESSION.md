@@ -1,12 +1,12 @@
-# graphs-comparability-lib — next-session work plan
+# graphs-algos-lib — next-session work plan
 
 Hand-off for continuing work on this library. Read this top-to-bottom once, then
 `CLAUDE.md` for the day-to-day rules. Everything below is specific to *this*
-codebase as it stands at commit on `develop` after CGD-1..4.
+codebase as it stands at commit on `develop` after GAL-1..4.
 
 ---
 
-## ⚠️ Status update — CGD-10..15 DONE (read this first; much below is now historical)
+## ⚠️ Status update — GAL-10..15 DONE (read this first; much below is now historical)
 
 The **entire roadmap (P0, D1–D5) is delivered and merged to `develop`** — PRs
 #3–#8. The engine has been **replaced**. Sections 0–5 below described the *old*
@@ -14,13 +14,13 @@ thesis-ported engine and its bugs; they are kept for history but no longer
 reflect the code. The **one open item** is the DJIA reproduction (see end of this
 section).
 
-- **CGD-10 (P0)** — the 3-sun `StackOverflow` was fixed (engine made total).
+- **GAL-10 (P0)** — the 3-sun `StackOverflow` was fixed (engine made total).
   *Superseded by the rewrite, but it unblocked the sweep.*
-- **CGD-5 / CGD-11 (D5)** — `docs/theory-review.md`. Verdict: the thesis
+- **GAL-5 / GAL-11 (D5)** — `docs/theory-review.md`. Verdict: the thesis
   *criterion* (Thm 2.22) is correct (it is Golumbic's forcing relation), but
   **Algorithm 2.3.1 was unsound, incomplete and under-counted**. Evidence from a
   brute-force oracle sweep.
-- **CGD-6 / CGD-12 (D4 + the fix)** — the engine was **rewritten**. The old
+- **GAL-6 / GAL-12 (D4 + the fix)** — the engine was **rewritten**. The old
   `GraphParser`/`Graph`/`Node`/`FactorGraphLevel` are **deleted**. Now:
   `ForcingRelation` (Golumbic Γ verdict + odd forcing-walk obstruction —
   sound & complete) and `ModularDecomposition` (canonical modular decomposition
@@ -32,9 +32,9 @@ section).
 
 ### Remaining epics — all DONE
 
-- **D1 / CGD-7 (PR #6) — DONE.** Mostly *subsumed* by the CGD-12 rewrite; PR #6
+- **D1 / GAL-7 (PR #6) — DONE.** Mostly *subsumed* by the GAL-12 rewrite; PR #6
   was residual polish (imports) + this roadmap refresh.
-- **D3 / CGD-8 (PR #7) — DONE.** Benchmark harness committed
+- **D3 / GAL-8 (PR #7) — DONE.** Benchmark harness committed
   (`Benchmark.main`), baselines + before/after in `docs/performance.md`. Hotspot
   was the prime-case `minimalModule` closure; made incremental O(n²)/call →
   ~2× on the realistic threshold-sweep path; cographs ~3 ms at n=150.
@@ -42,18 +42,18 @@ section).
   (p=0.5, n ≳ 100) is still **O(n⁴)** (~0.4–2 s). Not the target workload
   (thresholded correlation nets are sparse/structured). Fix if ever needed:
   near-linear MD (partition refinement), guarded by `OracleCharacterizationTest`.
-- **D2 / CGD-9 (PR #8) — DONE.** `BatchAnalyzer` — `analyzeAll` /
+- **D2 / GAL-9 (PR #8) — DONE.** `BatchAnalyzer` — `analyzeAll` /
   `thresholdSweep` (+ `*Parallel` variants over the common ForkJoinPool, gated
   below `MIN_PARALLEL_BATCH`). Intra-analysis parallelism *not* pursued
   (documented decision, with D3 evidence). Engine is stateless/thread-safe per call.
 
-### The one OPEN item — DJIA reproduction (D4 / CGD-6 sub-goal)
+### The one OPEN item — DJIA reproduction (D4 / GAL-6 sub-goal)
 
 Reproducing the thesis's **DJIA worked example** (Ch. III,
 `thesis_en/03_application_djia.md`, figs ~`image63/64`) is **not done**: the
 chapter has narrative + figures but **no machine-readable correlation matrix**,
 so it is *blocked on source data*. Everything else in D4 (oracle, sound/complete
-engine, correct count) is delivered. The CGD-6 epic is left open over just this.
+engine, correct count) is delivered. The GAL-6 epic is left open over just this.
 To finish: obtain the DJIA closing-price / correlation data, then add a
 `thresholdSweep` integration test/`docs/` note reproducing the network +
 threshold-raising iteration.
@@ -70,22 +70,22 @@ threshold-raising iteration.
 
 ## 0. Current state (what exists)
 
-- **Repo**: `tarvyn-analytics/graphs-comparability-lib` (private), default branch
+- **Repo**: `tarvyn-analytics/graphs-algos-lib` (private), default branch
   `develop`, GitFlow + branch protection (PR + `Verify PR` check; admin-merge
   allowed for the single maintainer). Local checkout:
-  `/mnt/d/projects/startups/graphs/graphs-comparability-lib`.
+  `/mnt/d/projects/startups/graphs/graphs-algos-lib`.
 - **What it does**: matrix → graph → comparability verdict + factor-graph
   decomposition + transitive-orientation **count**, or the obstructing cycle with
   the weakest correlation edge. Faithful, GUI-free port of the thesis C# appendix.
 - **Quality bar**: 59 tests green, ~89% line / ~78% branch, `./mvnw -Ppublish
   clean verify` clean, SNAPSHOT published to GitHub Packages, SonarCloud gate
   passing.
-- **Jira**: project **CGD** (*Comparability Graph Detection*); CGD-1..4 are
+- **Jira**: project **GAL** (*Graph Algos Lib*); GAL-1..4 are
   **Done**. New work = new epics (see §4–§5). Tool: `.claude/tools/jira/jira.sh`.
 
 ### Source map (the parts you'll touch)
 ```
-src/main/java/ch/tarvynanalytics/graphs/comparability/
+src/main/java/ch/tarvynanalytics/graphs/algos/
   ComparabilityAnalyzer.java   public entry point
   GraphInput.java              public; matrix -> graph (threshold |r|>cut)
   GraphParser.java             THE engine (decomposition + odd-cycle test + count)
@@ -164,10 +164,10 @@ the starting facts.
 
 ## 2. Operating rules (essentials; full version in CLAUDE.md)
 
-- Branch `feature/CGD-<n>-eb-<short-desc>` off `develop`; PR to `develop`;
+- Branch `feature/GAL-<n>-eb-<short-desc>` off `develop`; PR to `develop`;
   squash-merge (admin bypass ok); `Verify PR` must be green.
 - `./mvnw clean verify` before claiming done (80/70 coverage gate enforced).
-- Jira: `JIRA_PROJECT=CGD` is the default in `.claude/tools/jira/jira.sh`;
+- Jira: `JIRA_PROJECT=GAL` is the default in `.claude/tools/jira/jira.sh`;
   transition issues In Progress → Done with a PR/commit reference.
 - **Faithfulness invariant is currently in force** (CLAUDE.md #2). Directions
   D1/D3/D5 will likely *relax or retire* it deliberately — when you do, update
@@ -299,40 +299,40 @@ concurrently; D1 and D3 can partially merge (the adjacency change). Keep D2 last
 
 ## 5. Jira epics (created)
 
-These epics now exist in project **CGD** (execution-priority order):
+These epics now exist in project **GAL** (execution-priority order):
 
 | Jira | Direction | Title |
 |------|-----------|-------|
-| **CGD-5** | D5 | validate the thesis theory |
-| **CGD-6** | D4 | implementation correctness vs theory + thesis (oracles, DJIA) |
-| **CGD-7** | D1 | code quality & organization |
-| **CGD-8** | D3 | performance |
-| **CGD-9** | D2 | parallelization |
+| **GAL-5** | D5 | validate the thesis theory |
+| **GAL-6** | D4 | implementation correctness vs theory + thesis (oracles, DJIA) |
+| **GAL-7** | D1 | code quality & organization |
+| **GAL-8** | D3 | performance |
+| **GAL-9** | D2 | parallelization |
 
-Work each as `feature/CGD-<n>-eb-<desc>` → PR → `develop`, with the task issues
+Work each as `feature/GAL-<n>-eb-<desc>` → PR → `develop`, with the task issues
 hung under the relevant epic. The commands used to create the epics, for the
 record:
 
 ```bash
-J=.claude/tools/jira/jira.sh   # default project CGD
+J=.claude/tools/jira/jira.sh   # default project GAL
 
-$J create --type Epic --labels graphs-comparability-lib,theory \
+$J create --type Epic --labels graphs-algos-lib,theory \
   --summary "D5: validate the thesis theory — is Algorithm 2.3.1 a sound & complete comparability test?" \
   --description "Scrutinize the author-authored results (Lema 2.28, Lema 2.211, the Nota after 2.210, Algorithm 2.3.1; bracketed [5] etc. are citations). Relate the chain-folding to Golumbic's forcing relation and Gallai's forbidden subgraphs. Explain why the net is correctly rejected; find any missed non-comparability or wrongly-rejected comparability graph. Output docs/theory-review.md with soundness/completeness verdict and counterexample/confirming families. Suggested model: Opus 4.8. Complexity: High."
 
-$J create --type Epic --labels graphs-comparability-lib,correctness \
+$J create --type Epic --labels graphs-algos-lib,correctness \
   --summary "D4: implementation correctness vs theory + thesis (oracles, DJIA reproduction)" \
   --description "FIRST fix the 3-sun StackOverflow (engine must be total). Build a brute-force transitive-orientation oracle for small n; cross-check verdict+count against ground truth on n<=7-8 and on D5 families. Reproduce the thesis DJIA example (Ch. III) and its threshold-raising iteration. Decide the failure-walk contract (non-simple walks). Suggested model: Opus 4.8 (design) + Sonnet 4.6 (bulk tests). Complexity: Medium-High."
 
-$J create --type Epic --labels graphs-comparability-lib,refactor \
+$J create --type Epic --labels graphs-algos-lib,refactor \
   --summary "D1: code quality & organization of the engine" \
   --description "Replace identity List.contains with order-preserving sets / int-indexed BitSet adjacency; separate graph model / module detection / chain forcing / result lifting; rename the apendix/non-triangulable machinery; make pool mutation explicit; consider an immutable int-indexed internal graph. Preserve behaviour (guarded by D4) or document conscious changes; update CLAUDE.md faithfulness invariant. Suggested model: Sonnet 4.6 (Opus 4.8 for the graph-representation design). Complexity: Medium."
 
-$J create --type Epic --labels graphs-comparability-lib,performance \
+$J create --type Epic --labels graphs-algos-lib,performance \
   --summary "D3: performance — measure then optimize single-analysis" \
   --description "Add a benchmark harness (JMH or simple) with realistic generators. Make canCreateOddCycle incremental (avoid O(L^3) recompute), memoize getActualNodes/findMinEdge, adopt O(1) adjacency (shared with D1), avoid quadratic chain fold-copies. Report before/after. Suggested model: Sonnet 4.6 (Opus 4.8 for the incremental odd-cycle algorithm). Complexity: Medium."
 
-$J create --type Epic --labels graphs-comparability-lib,parallelism \
+$J create --type Epic --labels graphs-algos-lib,parallelism \
   --summary "D2: parallelization — decide what's worth it, act on it" \
   --description "Core is sequential and graphs are small; confirm with D3 benchmarks that intra-analysis parallelism is low-value. Deliver batch-level parallelism (threshold sweeps, rolling windows, Monte-Carlo) over independent analyze calls, profile-gated like corrcalc-lib, or a documented decision against intra-analysis parallelism with evidence. Suggested model: Sonnet 4.6. Complexity: Low-Medium."
 ```
@@ -345,9 +345,9 @@ Execution order top-to-bottom.
 
 | Jira | Dir | Epic | Complexity | Model | Depends on |
 |------|-----|------|-----------|-------|-----------|
-| (CGD-6, 1st task) | P0  | make engine total — fix 3-sun crash | Small | Sonnet 4.6 | — |
-| **CGD-5** | D5  | Validate thesis theory | High | **Opus 4.8** | — |
-| **CGD-6** | D4  | Implementation correctness + oracles | Med-High | Opus 4.8 + Sonnet 4.6 | P0, D5 |
-| **CGD-7** | D1  | Code quality / refactor | Medium | Sonnet 4.6 (+Opus design) | D4 |
-| **CGD-8** | D3  | Performance | Medium | Sonnet 4.6 (+Opus algo) | D1 |
-| **CGD-9** | D2  | Parallelization | Low-Med | Sonnet 4.6 | D3 |
+| (GAL-6, 1st task) | P0  | make engine total — fix 3-sun crash | Small | Sonnet 4.6 | — |
+| **GAL-5** | D5  | Validate thesis theory | High | **Opus 4.8** | — |
+| **GAL-6** | D4  | Implementation correctness + oracles | Med-High | Opus 4.8 + Sonnet 4.6 | P0, D5 |
+| **GAL-7** | D1  | Code quality / refactor | Medium | Sonnet 4.6 (+Opus design) | D4 |
+| **GAL-8** | D3  | Performance | Medium | Sonnet 4.6 (+Opus algo) | D1 |
+| **GAL-9** | D2  | Parallelization | Low-Med | Sonnet 4.6 | D3 |

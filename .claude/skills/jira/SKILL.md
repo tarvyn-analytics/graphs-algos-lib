@@ -1,9 +1,9 @@
-# Jira Skill — graphs-comparability-lib
+# Jira Skill — graphs-algos-lib
 
 One script does everything: `.claude/tools/jira/jira.sh` (bash + curl + jq,
 Jira Cloud REST v3). Auth comes from the `JIRA_BASE_URL`, `JIRA_EMAIL`,
 `JIRA_API_TOKEN` environment variables (already set in `~/.bashrc`);
-default project is `CGD` (override with `JIRA_PROJECT` or `--project`).
+default project is `GAL` (override with `JIRA_PROJECT` or `--project`).
 
 ## Commands
 
@@ -13,17 +13,17 @@ J=.claude/tools/jira/jira.sh
 # Create — Tasks link to their Epic and Sub-tasks to their parent Task
 # through the same --parent flag (Jira Cloud parent field handles both)
 $J create --type Epic --summary "..." --description "..." [--labels a,b]
-$J create --type Task --summary "..." --parent CGD-1
-$J create --type Subtask --summary "..." --parent CGD-3
+$J create --type Task --summary "..." --parent GAL-1
+$J create --type Subtask --summary "..." --parent GAL-3
 
 # Read
-$J view CGD-3
-$J search --jql "project = CGD AND status != Done ORDER BY created DESC" [--max 50]
+$J view GAL-3
+$J search --jql "project = GAL AND status != Done ORDER BY created DESC" [--max 50]
 
 # Update
-$J transition CGD-3 "In Progress"
-$J transition CGD-3 Done --comment "Merged PR #1"
-$J comment CGD-3 "Pushed to remote"
+$J transition GAL-3 "In Progress"
+$J transition GAL-3 Done --comment "Merged PR #1"
+$J comment GAL-3 "Pushed to remote"
 ```
 
 ## Conventions

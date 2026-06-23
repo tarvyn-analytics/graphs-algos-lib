@@ -3,7 +3,7 @@
 Guidance for Claude Code when working in this repository.
 
 Read `README.md` first — it owns the project overview, the public API examples,
-the package layout and the scope of the comparability test. This file tells you
+the package layout and the scope of each analysis. This file tells you
 how to work on the code: the rules that must hold and the common task recipes.
 
 ## Commands
@@ -14,7 +14,7 @@ how to work on the code: the rules that must hold and the common task recipes.
 ./mvnw test -Dtest=ClassName  # single test class
 ```
 
-Single module; the artifact `ch.tarvynanalytics.graphs:graphs-comparability-lib`
+Single module; the artifact `ch.tarvynanalytics.graphs:graphs-algos-lib`
 is published to GitHub Packages. Building requires **JDK 21+**; the bytecode
 target is `--release 21`. Coverage report:
 `target/site/jacoco/index.html` (CSV next to it for scripting). This is a
@@ -29,7 +29,7 @@ library — there is no application to run; the tests are the executable spec.
    saves. (Test scope, e.g. JUnit, is unconstrained.)
 2. **Correct, standard algorithms — not the thesis port.** The original C#
    chain-folding engine was found to be unsound *and* incomplete and to
-   under-count orientations (see `docs/theory-review.md`, CGD-5); it has been
+   under-count orientations (see `docs/theory-review.md`, GAL-5); it has been
    replaced. The verdict + obstruction come from **Golumbic's forcing relation
    (Γ)** in `ForcingRelation` (sound & complete: a graph is a comparability graph
    iff no implication class contains an arc and its reverse). The orientation
@@ -148,28 +148,28 @@ tested without `System.exit`. CSV parsing lives in the package-private
 `CorrelationCsv` (hand-rolled, invariant #1); leave squareness/finiteness to
 `GraphInput.fromCorrelation`. Exit codes are result-only (`0` ran / `2` usage /
 `1` input-IO). Run it: `./mvnw -q package -DskipTests` then
-`java -jar target/graphs-comparability-lib-*.jar matrix.csv --threshold 0.5`. The
+`java -jar target/graphs-algos-lib-*.jar matrix.csv --threshold 0.5`. The
 console/`System.exit` Sonar rules (`S106`/`S1147`) are silenced for `**/cli/*.java`
 in the pom.
 
 ## Delivery: Jira, Git, PRs, CI
 
-- **Jira** (project `CGD`, *Comparability Graph Detection*): use
+- **Jira** (project `GAL`, *Graph Algos Lib*): use
   `.claude/tools/jira/jira.sh` — full usage in `.claude/skills/jira/SKILL.md`.
   Every piece of work hangs off an issue; epic for the initiative, task per
   deliverable. Transition to `In Progress` when starting, `Done` with a PR/commit
   reference when finished. (Sub-task issue type is named `Subtask`.)
 - **GitFlow**: `main` (released) ← `develop` (integration) ← `feature/*`. Branch
-  naming: `feature/CGD-<n>-eb-<short-description>`. PRs target `develop` and are
+  naming: `feature/GAL-<n>-eb-<short-description>`. PRs target `develop` and are
   **squash**-merged; only release merges go `develop` → `main` and use a **true
   merge commit** (`gh pr merge --merge`), never squash. After a release,
   back-merge main into develop and bump the pom to the next `-SNAPSHOT`. Full
   procedure: `.claude/skills/release/SKILL.md`.
 - **Commit style**: conventional commits with scope and issue key, e.g.
-  `feat(lib): [CGD-3]: port the comparability engine`; body explains the why.
+  `feat(lib): [GAL-3]: port the comparability engine`; body explains the why.
   GPG signing fails under WSL ("Unusable secret key") — use
   `git commit --no-gpg-sign` from WSL.
-- **GitHub** (`tarvyn-analytics/graphs-comparability-lib`, private): use the `gh`
+- **GitHub** (`tarvyn-analytics/graphs-algos-lib`, private): use the `gh`
   CLI directly — `gh pr create --base develop`, `gh pr checks --watch`,
   `gh pr merge --squash`, `gh run watch`.
 - **CI** (`.github/workflows/`): `validate-on-pull-request.yml` runs
