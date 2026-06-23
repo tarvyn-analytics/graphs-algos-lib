@@ -1,35 +1,37 @@
-# graphs-comparability-lib
+# graphs-algos-lib
 
-Pure-Java library that decides whether an undirected graph is a **comparability
-graph** (equivalently, *transitively orientable*), and if so describes how. The
-graph is built from a square **correlation** or **adjacency** matrix; the
-analysis is a faithful, GUI-free port of the algorithm from the master's thesis
+Pure-Java **graph-algorithms** library for the structural analysis of a graph
+built from a square **correlation** or **adjacency** matrix. It began as a
+transitive-orientation (comparability) analysis ported from the master's thesis
 *"Securities-market analysis using transitively orientable graphs"* (the C#
-prototype's `GraphParser` / `Graph_NonOriented` / `FactorGraphLevel` / `Node`).
+prototype's `GraphParser` / `Graph_NonOriented` / `FactorGraphLevel` / `Node`) and
+has since grown a family of independent structural analyses — hence
+`graphs-algos-lib`:
 
-Given a matrix it produces one of two outcomes:
+- **Comparability** (transitive orientability) — the factor-graph (modular)
+  decomposition hierarchy and the number of distinct transitive orientations, or,
+  when the graph is not comparability, the obstructing **odd chordless cycle**
+  (an "odd hole") with the weakest correlation edge on it (the cheapest edge to
+  drop to break the obstruction). See [What it computes](#what-it-computes).
+- **Chordality / decomposability** — a perfect elimination ordering when the graph
+  is chordal, otherwise a witnessing hole and a greedy **chordal completion**.
+  See [Chordality / decomposability](#chordality--decomposability).
+- **Decomposability repair** — weakest-link edge deletion down to a chordal
+  (decomposable) graph.
+- **Structural balance** — signed-graph (Heider/Harary) balance, with an
+  odd-negative cycle as the conflict witness.
+- **Cross-estimator robustness** — the stable core and outlier-sensitive edges
+  across several correlation estimators of the same variables.
 
-- **comparability** — the factor-graph (modular) decomposition hierarchy plus
-  the number of distinct transitive orientations; or
-- **not comparability** — the obstructing **odd chordless cycle** (an "odd
-  hole"), reported in the original vertices, together with the weakest
-  correlation edge on it (the cheapest edge to drop, e.g. by raising the
-  threshold, to break the obstruction).
-
-Independently of that verdict it also reports whether the same graph is
-**chordal** (decomposable) — a perfect elimination ordering when it is, otherwise
-a witnessing hole and a greedy **chordal completion** (the fill-in edges that make
-it decomposable). See [Chordality / decomposability](#chordality--decomposability).
-
-There is no GUI and there are **zero runtime dependencies**; the result is a
+There is no GUI and there are **zero runtime dependencies**; every result is a
 plain immutable object you can inspect or serialize.
 
 ## Quick start
 
 ```java
-import ch.tarvynanalytics.graphs.comparability.ComparabilityAnalyzer;
-import ch.tarvynanalytics.graphs.comparability.GraphInput;
-import ch.tarvynanalytics.graphs.comparability.model.AnalysisResult;
+import ch.tarvynanalytics.graphs.algos.ComparabilityAnalyzer;
+import ch.tarvynanalytics.graphs.algos.GraphInput;
+import ch.tarvynanalytics.graphs.algos.model.AnalysisResult;
 
 double[][] correlation = {
     {1.00, 0.82, 0.10, 0.05},
@@ -198,9 +200,9 @@ with like. Estimators are matched on **selectivity** instead: each contributes i
 top-K strongest edges by magnitude.
 
 ```java
-import ch.tarvynanalytics.graphs.comparability.CrossEstimatorAnalyzer;
-import ch.tarvynanalytics.graphs.comparability.EstimatorMatrix;
-import ch.tarvynanalytics.graphs.comparability.model.CrossEstimatorReport;
+import ch.tarvynanalytics.graphs.algos.CrossEstimatorAnalyzer;
+import ch.tarvynanalytics.graphs.algos.EstimatorMatrix;
+import ch.tarvynanalytics.graphs.algos.model.CrossEstimatorReport;
 
 CrossEstimatorReport r = CrossEstimatorAnalyzer.analyze(
         List.of(EstimatorMatrix.of("pearson",  pearson),
@@ -227,11 +229,11 @@ hand-computed fixtures.
 ## Storing / exporting the result
 
 The result is a plain object — keep it, or serialize it with the built-in,
-zero-dependency exporters in `…comparability.export`:
+zero-dependency exporters in `…algos.export`:
 
 ```java
-import ch.tarvynanalytics.graphs.comparability.export.JsonExporter;
-import ch.tarvynanalytics.graphs.comparability.export.DotExporter;
+import ch.tarvynanalytics.graphs.algos.export.JsonExporter;
+import ch.tarvynanalytics.graphs.algos.export.DotExporter;
 
 String json = JsonExporter.toJson(result);                 // full result as JSON
 String dot  = DotExporter.inputGraphToDot(result);         // input graph as Graphviz DOT
@@ -258,7 +260,7 @@ thread-safe. `BatchAnalyzer` runs many independent analyses, optionally in
 parallel over the common `ForkJoinPool`:
 
 ```java
-import ch.tarvynanalytics.graphs.comparability.BatchAnalyzer;
+import ch.tarvynanalytics.graphs.algos.BatchAnalyzer;
 
 // the thesis workflow: analyse one correlation matrix across rising thresholds
 double[] thresholds = {0.3, 0.4, 0.5, 0.6, 0.7};
@@ -286,7 +288,7 @@ AAPL,MSFT,SPY,GLD,TLT
 
 ```bash
 ./mvnw -q package -DskipTests
-java -jar target/graphs-comparability-lib-0.1.0-SNAPSHOT.jar matrix.csv --threshold 0.5
+java -jar target/graphs-algos-lib-0.1.0-SNAPSHOT.jar matrix.csv --threshold 0.5
 ```
 
 ```
@@ -317,7 +319,7 @@ To compare several estimators, pass `--robust` and two or more CSVs over the sam
 variables (the estimator name is each file's stem):
 
 ```bash
-java -jar target/graphs-comparability-lib-0.1.0-SNAPSHOT.jar --robust \
+java -jar target/graphs-algos-lib-0.1.0-SNAPSHOT.jar --robust \
     pearson.csv spearman.csv kendall.csv partial.csv --top 144
 ```
 
@@ -342,7 +344,7 @@ matches the K to Pearson's 0.8 graph). With `--json` it emits the
 ## Package layout
 
 ```
-ch.tarvynanalytics.graphs.comparability
+ch.tarvynanalytics.graphs.algos
   ComparabilityAnalyzer   – entry point: analyze(GraphInput) -> AnalysisResult
   BatchAnalyzer           – run many analyses / threshold sweeps, optionally parallel
   DecomposabilityDiagnostic – weakest-link repair to a chordal (decomposable) graph
@@ -382,12 +384,12 @@ Requires JDK 21+. Uses the Maven wrapper.
 This is primarily a library and the tests are its executable spec; it also ships
 a small command-line interface (see above) for analysing a correlation-matrix CSV
 directly. The published artifact (jar + sources + javadoc) goes to GitHub Packages
-under `ch.tarvynanalytics.graphs:graphs-comparability-lib`.
+under `ch.tarvynanalytics.graphs:graphs-algos-lib`.
 
 ## Development
 
-GitFlow: `feature/CGD-<n>-eb-<desc>` → squash-merge to `develop`; releases merge
+GitFlow: `feature/GAL-<n>-eb-<desc>` → squash-merge to `develop`; releases merge
 `develop` → `main`. CI validates every PR (build, tests, coverage, SonarCloud
 quality gate) and publishes on push. See `CLAUDE.md` for the working rules and
 `.claude/skills/` for the Jira and release helpers. Work is tracked in Jira
-project **CGD** (Comparability Graph Detection).
+project **GAL** (Graph Algos Lib).

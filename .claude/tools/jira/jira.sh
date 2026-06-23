@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# jira.sh - Jira Cloud CLI for the graphs-comparability-lib project (Jira: CGD).
+# jira.sh - Jira Cloud CLI for the graphs-algos-lib project (Jira: GAL).
 #
 # Commands:
 #   jira.sh create --type Epic|Task|Subtask --summary "..." [--description "..."]
-#                  [--parent CGD-N] [--labels a,b] [--priority High] [--project CGD]
-#   jira.sh view CGD-N
-#   jira.sh search --jql "project = CGD AND status != Done" [--max 50]
-#   jira.sh transition CGD-N "In Progress" [--comment "..."]
-#   jira.sh comment CGD-N "comment text"
+#                  [--parent GAL-N] [--labels a,b] [--priority High] [--project GAL]
+#   jira.sh view GAL-N
+#   jira.sh search --jql "project = GAL AND status != Done" [--max 50]
+#   jira.sh transition GAL-N "In Progress" [--comment "..."]
+#   jira.sh comment GAL-N "comment text"
 #
 # Tasks link to their epic and sub-tasks to their parent task through the same
 # --parent flag (modern Jira Cloud uses the parent field for both).
@@ -18,7 +18,7 @@ set -euo pipefail
 : "${JIRA_EMAIL:?JIRA_EMAIL is not set}"
 : "${JIRA_API_TOKEN:?JIRA_API_TOKEN is not set}"
 
-DEFAULT_PROJECT="${JIRA_PROJECT:-CGD}"
+DEFAULT_PROJECT="${JIRA_PROJECT:-GAL}"
 
 api() { # api METHOD PATH [JSON_BODY]
     local method=$1 path=$2 body=${3:-}

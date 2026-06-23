@@ -1,4 +1,4 @@
-# Plan: near-linear modular decomposition for large graphs (CGD-16)
+# Plan: near-linear modular decomposition for large graphs (GAL-16)
 
 A start-here implementation plan for replacing the modular-decomposition
 **prime-case** hotspot with a near-linear algorithm, size-gated so small graphs
@@ -32,7 +32,7 @@ Progress against §5 (update this section whenever a step lands):
   builders are proven equivalent. `ModularDecompositionSizeGateTest` pins the flip.
 - [x] **Step 5 — benchmark + docs.** Done, PR #18. `Benchmark` gained a simple-vs-linear
   builder sweep; `docs/performance.md` records the before/after numbers (n=150 dense from
-  ~2 s to ~5 ms, 439×) and the gate constant. **All steps complete — CGD-16 done.**
+  ~2 s to ~5 ms, 439×) and the gate constant. **All steps complete — GAL-16 done.**
 
 Each step is one small PR off `develop`, oracle-guarded. To keep a session's
 context small, read only **this plan + the files named under the step in §5** —
