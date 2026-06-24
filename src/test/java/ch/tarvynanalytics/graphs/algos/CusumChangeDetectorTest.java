@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -139,5 +140,72 @@ class CusumChangeDetectorTest {
     void onMatrix_Null_ThrowsIllegalArgumentException() {
         ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.equity(), new Calibration(0.0, 0.1, 0.0));
         assertThrows(IllegalArgumentException.class, () -> d.onMatrix(null));
+    }
+
+    /**
+     * Spec §2.4 {@code reset_ids}: a window-id change re-arms the one-fire-per-window debounce, so a
+     * second window can fire again where the global debounce would have suppressed it. The same matrix
+     * sequence fed without window ids fires only once — that gap is exactly what would undercount the
+     * false-alarm rate over a long multi-session calm span.
+     */
+    @Test
+    void onMatrixWindowed_WindowIdChange_ReArmsDebounceAndFiresOncePerWindow() {
+        ChangeDetector windowed = ChangeDetectors.create(2, DetectorConfig.equity(), new Calibration(0.0, 0.1, 0.0));
+        int windowedFires = 0;
+        assertNull(windowed.onMatrix(m2(0.0), 1L));                           // first matrix: no transition
+        windowedFires += windowed.onMatrix(m2(0.6), 1L).fired() ? 1 : 0;      // S+=5, not > h=5
+        windowedFires += windowed.onMatrix(m2(0.0), 1L).fired() ? 1 : 0;      // S+=10 > 5 -> FIRE, debounce
+        windowedFires += windowed.onMatrix(m2(0.6), 1L).fired() ? 1 : 0;      // already fired this window
+        windowedFires += windowed.onMatrix(m2(0.0), 2L).fired() ? 1 : 0;      // new window re-arms; S+ back to 5
+        windowedFires += windowed.onMatrix(m2(0.6), 2L).fired() ? 1 : 0;      // S+=10 > 5 -> FIRE again
+        assertEquals(2, windowedFires);                                        // one fire per window
+        assertEquals(1L, windowed.firstFire().get().seq());                    // first fire is the window-1 one
+
+        // Same sequence, single window (no ids): the global debounce suppresses the second fire.
+        ChangeDetector single = ChangeDetectors.create(2, DetectorConfig.equity(), new Calibration(0.0, 0.1, 0.0));
+        int singleFires = 0;
+        single.onMatrix(m2(0.0));
+        for (double r : new double[]{0.6, 0.0, 0.6, 0.0, 0.6}) {
+            singleFires += single.onMatrix(m2(r)).fired() ? 1 : 0;
+        }
+        assertEquals(1, singleFires);                                          // fires once ever -> would undercount FA
+    }
+
+    @Test
+    void onMatrixWindowed_WindowIdChange_KeepsPreviousMatrix_NotASessionReset() {
+        ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.equity(), new Calibration(0.0, 0.1, 0.0));
+        assertNull(d.onMatrix(m2(0.0), 1L));
+        d.onMatrix(m2(0.6), 1L);
+        // Crossing into window 2 must NOT drop the previous matrix (cf. onSessionBoundary): the
+        // transition into the new window is still scored against the last matrix of window 1.
+        ChangeSignal firstOfWindow2 = d.onMatrix(m2(0.0), 2L);
+        assertNotNull(firstOfWindow2);
+        assertEquals(0.6, firstOfWindow2.metrics().weightedChange(), 1e-12);   // |0.0 - 0.6|, prev kept
+    }
+
+    @Test
+    void onMatrixWindowed_WindowIdChange_LeavesOppositeArmUntouched() {
+        // mu = 1.0 makes a flat change of 0 give z = -10, so the lower arm grows while the firing
+        // (UPPER) arm stays 0. The re-arm resets only the firing arm, so S- must carry across windows.
+        ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.equity(), new Calibration(1.0, 0.1, 0.0));
+        assertNull(d.onMatrix(m2(0.9), 1L));
+        ChangeSignal w1 = d.onMatrix(m2(0.9), 1L);     // z=-10 -> S- = max(0, 0+10-1) = 9
+        assertEquals(9.0, w1.sMinus(), 1e-12);
+        ChangeSignal w2 = d.onMatrix(m2(0.9), 2L);     // window change re-arms S+ only; S- = max(0, 9+10-1) = 18
+        assertEquals(18.0, w2.sMinus(), 1e-12);
+        assertEquals(0.0, w2.sPlus(), 1e-12);
+    }
+
+    @Test
+    void onSessionBoundary_AfterWindowedCalls_ClearsWindowTracking() {
+        ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.equity(), new Calibration(0.0, 0.1, 0.0));
+        d.onMatrix(m2(0.0), 7L);
+        d.onMatrix(m2(0.6), 7L);                 // S+ built up
+        d.onSessionBoundary();                    // full reset, including window tracking
+        // Same id 7 as before, but the boundary dropped the previous matrix and cleared tracking:
+        // this is a fresh first matrix (null), not a continuation.
+        assertNull(d.onMatrix(m2(0.9), 7L));
+        ChangeSignal s = d.onMatrix(m2(0.9), 8L); // new id: re-arm is a no-op (S+ already 0); change 0 -> S+ stays 0
+        assertEquals(0.0, s.sPlus(), 1e-12);
     }
 }

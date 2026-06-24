@@ -23,6 +23,8 @@ final class CusumChangeDetector implements ChangeDetector {
     private long seq;
     private boolean alreadyFired;
     private ChangeSignal firstFire;
+    private boolean hasWindowId;
+    private long currentWindowId;
 
     CusumChangeDetector(int order, DetectorConfig config, Calibration calibration) {
         if (order < 0) {
@@ -36,6 +38,23 @@ final class CusumChangeDetector implements ChangeDetector {
 
     @Override
     public ChangeSignal onMatrix(double[][] correlation) {
+        return ingest(correlation);
+    }
+
+    @Override
+    public ChangeSignal onMatrix(double[][] correlation, long windowId) {
+        if (hasWindowId && windowId != currentWindowId) {
+            // spec §2.4 reset_ids: a new window re-arms the debounce and the firing arm only —
+            // the previous matrix and the opposite arm are left intact (cf. onSessionBoundary()).
+            alreadyFired = false;
+            cusum.resetArm(config.fireArm());
+        }
+        hasWindowId = true;
+        currentWindowId = windowId;
+        return ingest(correlation);
+    }
+
+    private ChangeSignal ingest(double[][] correlation) {
         requireSquareOfOrder(correlation);
         if (previous == null) {
             previous = copy(correlation);
@@ -76,6 +95,7 @@ final class CusumChangeDetector implements ChangeDetector {
         previous = null;
         cusum.reset();
         alreadyFired = false;
+        hasWindowId = false;   // the boundary is itself the reset; the next windowed call must not re-arm again
     }
 
     @Override
