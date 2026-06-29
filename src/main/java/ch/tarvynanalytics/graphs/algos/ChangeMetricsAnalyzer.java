@@ -2,6 +2,9 @@ package ch.tarvynanalytics.graphs.algos;
 
 import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.algos.model.ChangeMetrics;
+import ch.tarvynanalytics.graphs.algos.model.PairChange;
+
+import java.util.List;
 
 /**
  * Computes the Initiative-S S3 structural-change metric between two
@@ -62,6 +65,39 @@ public final class ChangeMetricsAnalyzer {
                     "matrix dimension changed; got [" + m + "x" + m + "] and [" + n + "x" + n + "]");
         }
         return ChangeMetricsEngine.compute(previous, current, threshold);
+    }
+
+    /**
+     * The top-{@code k} variable pairs contributing to {@link ChangeMetrics#weightedChange()} for one
+     * transition {@code previous -> current}, ranked by {@code |Δr|} descending (ties broken by lower
+     * {@code i}, then lower {@code j}). Only pairs finite in <em>both</em> matrices — the intersection
+     * valid-pair set {@code V} that {@code weightedChange} averages — are eligible; {@code NaN} /
+     * {@code ±Infinity} pairs are excluded. Returns at most {@code k} pairs (all eligible pairs when
+     * fewer than {@code k} exist), and an empty list when {@code k <= 0} or no pair is valid in both
+     * windows.
+     *
+     * <p>This is an opt-in, second {@code O(m^2)} pass over the matrices, deliberately separate from
+     * {@link #analyze} so the per-transition metric cost stays bounded for callers that do not need
+     * attribution.</p>
+     *
+     * @param previous {@code C_{t-1}}, a square correlation matrix
+     * @param current  {@code C_t}, a square correlation matrix of the same order as {@code previous}
+     * @param k        the maximum number of contributing pairs to return
+     * @return the top contributing pairs, descending by {@code |Δr|} (never {@code null})
+     * @throws IllegalArgumentException if {@code previous} or {@code current} is {@code null}
+     * @throws InvalidInputException    if either matrix is not square, or their orders differ
+     */
+    public static List<PairChange> topContributors(double[][] previous, double[][] current, int k) {
+        if (previous == null || current == null) {
+            throw new IllegalArgumentException("previous and current matrices must not be null");
+        }
+        int m = requireSquare(previous, "previous");
+        int n = requireSquare(current, "current");
+        if (m != n) {
+            throw new InvalidInputException(
+                    "matrix dimension changed; got [" + m + "x" + m + "] and [" + n + "x" + n + "]");
+        }
+        return ChangeMetricsEngine.topContributors(previous, current, k);
     }
 
     private static int requireSquare(double[][] matrix, String name) {
