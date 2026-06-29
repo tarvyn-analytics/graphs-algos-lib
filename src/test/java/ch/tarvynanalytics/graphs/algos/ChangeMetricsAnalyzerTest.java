@@ -2,6 +2,7 @@ package ch.tarvynanalytics.graphs.algos;
 
 import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.algos.model.ChangeMetrics;
+import ch.tarvynanalytics.graphs.algos.model.PairChange;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -167,6 +168,90 @@ class ChangeMetricsAnalyzerTest {
         assertEquals(5, m.nComponents());
         assertEquals(0.2, m.largestComponentFraction(), 1e-12);
         assertEquals(List.of(1, 1, 1, 1, 1), m.componentSizes());
+    }
+
+    // ---- topContributors: hand-computed attribution (H1, GAL-29) ----
+    // C_A -> C_B per-pair |Δr|: (0,1)=0.40, (1,2)=0.30, (0,2)=0.00.
+
+    @Test
+    void topContributors_RanksAllValidPairsByAbsDeltaDescending() {
+        List<PairChange> top = ChangeMetricsAnalyzer.topContributors(C_A, C_B, 3);
+        assertEquals(3, top.size());
+        assertEquals(new PairChange(0, 1, 0.40), top.get(0));
+        assertEquals(new PairChange(1, 2, 0.30), top.get(1));
+        assertEquals(new PairChange(0, 2, 0.00), top.get(2));
+    }
+
+    @Test
+    void topContributors_CapsToK_WhenMoreValidPairsExist() {
+        List<PairChange> top = ChangeMetricsAnalyzer.topContributors(C_A, C_B, 2);
+        assertEquals(List.of(new PairChange(0, 1, 0.40), new PairChange(1, 2, 0.30)), top);
+    }
+
+    @Test
+    void topContributors_ReturnsAllPairs_WhenKExceedsValidPairCount() {
+        List<PairChange> top = ChangeMetricsAnalyzer.topContributors(C_A, C_B, 99);
+        assertEquals(3, top.size());
+    }
+
+    @Test
+    void topContributors_KZeroOrNegative_IsEmpty() {
+        assertEquals(List.of(), ChangeMetricsAnalyzer.topContributors(C_A, C_B, 0));
+        assertEquals(List.of(), ChangeMetricsAnalyzer.topContributors(C_A, C_B, -1));
+    }
+
+    @Test
+    void topContributors_BreaksTiesByLowerIndexThenLowerJ() {
+        // prev: all off-diagonals 0; cur: (0,1)=(0,2)=(1,2)=0.5, rest 0 => three pairs tie at |Δr|=0.5.
+        double[][] prev = identity(4);
+        double[][] cur = identity(4);
+        cur[0][1] = cur[1][0] = 0.5;
+        cur[0][2] = cur[2][0] = 0.5;
+        cur[1][2] = cur[2][1] = 0.5;
+        List<PairChange> top = ChangeMetricsAnalyzer.topContributors(prev, cur, 3);
+        assertEquals(List.of(new PairChange(0, 1, 0.5), new PairChange(0, 2, 0.5), new PairChange(1, 2, 0.5)), top);
+    }
+
+    @Test
+    void topContributors_ExcludesPairsInvalidInEitherWindow() {
+        // (0,2) NaN in cur => only (0,1)=0.40 and (1,2)=0.30 are eligible.
+        double[][] cb = {
+                {1.00, 0.50, Double.NaN},
+                {0.50, 1.00, 0.60},
+                {Double.NaN, 0.60, 1.00}
+        };
+        List<PairChange> top = ChangeMetricsAnalyzer.topContributors(C_A, cb, 5);
+        assertEquals(List.of(new PairChange(0, 1, 0.40), new PairChange(1, 2, 0.30)), top);
+    }
+
+    @Test
+    void topContributors_NoValidPairs_IsEmpty() {
+        double[][] allNaN = {
+                {1.00, Double.NaN, Double.NaN},
+                {Double.NaN, 1.00, Double.NaN},
+                {Double.NaN, Double.NaN, 1.00}
+        };
+        assertEquals(List.of(), ChangeMetricsAnalyzer.topContributors(allNaN, C_B, 3));
+    }
+
+    @Test
+    void topContributors_NullMatrix_Throws() {
+        assertThrows(IllegalArgumentException.class, () -> ChangeMetricsAnalyzer.topContributors(null, C_B, 3));
+        assertThrows(IllegalArgumentException.class, () -> ChangeMetricsAnalyzer.topContributors(C_A, null, 3));
+    }
+
+    @Test
+    void topContributors_NonSquare_ThrowsInvalidInputException() {
+        double[][] ragged = {{1.0, 0.1}, {0.1}};
+        assertThrows(InvalidInputException.class, () -> ChangeMetricsAnalyzer.topContributors(ragged, C_B, 3));
+    }
+
+    @Test
+    void topContributors_MismatchedDimensions_ThrowsInvalidInputException() {
+        InvalidInputException ex = assertThrows(InvalidInputException.class,
+                () -> ChangeMetricsAnalyzer.topContributors(C_A, identity(2), 3));
+        assertTrue(ex.getMessage().contains("[3x3]"));
+        assertTrue(ex.getMessage().contains("[2x2]"));
     }
 
     // ---- validation ----

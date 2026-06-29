@@ -114,6 +114,17 @@ class ModelTest {
     }
 
     @Test
+    void pairChange_AccessorsAndEquality() {
+        PairChange p = new PairChange(0, 2, 0.4);
+        assertEquals(0, p.i());
+        assertEquals(2, p.j());
+        assertEquals(0.4, p.absDelta());
+        assertEquals(new PairChange(0, 2, 0.4), p);
+        assertNotEquals(new PairChange(0, 1, 0.4), p);
+        assertTrue(p.toString().contains("0.4"));
+    }
+
+    @Test
     void records_EqualityAndToString() {
         assertEquals(new NodeView(0, "a"), new NodeView(0, "a"));
         assertNotEquals(new NodeView(0, "a"), new NodeView(1, "a"));

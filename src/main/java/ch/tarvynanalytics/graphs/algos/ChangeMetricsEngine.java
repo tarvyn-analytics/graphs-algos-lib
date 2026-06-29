@@ -1,10 +1,12 @@
 package ch.tarvynanalytics.graphs.algos;
 
 import ch.tarvynanalytics.graphs.algos.model.ChangeMetrics;
+import ch.tarvynanalytics.graphs.algos.model.PairChange;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -79,6 +81,38 @@ final class ChangeMetricsEngine {
 
         return new ChangeMetrics(weightedChange, densityLevel, edgeXor,
                 cluster.nComponents, cluster.largestComponentFraction, cluster.componentSizes);
+    }
+
+    /**
+     * The top-{@code k} contributing pairs to the weighted change, ranked by {@code |Δr|} descending
+     * (ties broken by lower {@code i}, then lower {@code j}). Only pairs finite in <em>both</em>
+     * matrices — the intersection valid-pair set {@code V} — are eligible. A separate {@code O(m^2)}
+     * collection pass; see {@link ChangeMetricsAnalyzer#topContributors}.
+     *
+     * @param previous {@code C_{t-1}}, square, order {@code m}
+     * @param current  {@code C_t}, square, order {@code m}
+     * @param k        the maximum number of contributing pairs to return
+     * @return at most {@code k} pairs, descending by {@code |Δr|}; empty when {@code k <= 0} or {@code |V| = 0}
+     */
+    static List<PairChange> topContributors(double[][] previous, double[][] current, int k) {
+        if (k <= 0) {
+            return List.of();
+        }
+        int m = current.length;
+        List<PairChange> changes = new ArrayList<>();
+        for (int i = 0; i < m; i++) {
+            for (int j = i + 1; j < m; j++) {
+                double a = previous[i][j];
+                double b = current[i][j];
+                if (Double.isFinite(a) && Double.isFinite(b)) {
+                    changes.add(new PairChange(i, j, Math.abs(b - a)));
+                }
+            }
+        }
+        changes.sort(Comparator.comparingDouble(PairChange::absDelta).reversed()
+                .thenComparingInt(PairChange::i)
+                .thenComparingInt(PairChange::j));
+        return List.copyOf(changes.subList(0, Math.min(k, changes.size())));
     }
 
     /** Connected components of the density edge set, via hand-rolled union-find (zero deps). */
