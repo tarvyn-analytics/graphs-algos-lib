@@ -2,10 +2,12 @@ package ch.tarvynanalytics.graphs.algos;
 
 import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.algos.model.ChangeSignal;
+import ch.tarvynanalytics.graphs.algos.model.FireDirection;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -77,14 +79,99 @@ class CusumChangeDetectorTest {
     }
 
     @Test
-    void onMatrix_LowerArmConfig_FiresOnDefusion() {
+    void onMatrix_LegacyLowerArmConfig_FiresOnChangeMetricLowerArm_MechanicsOnly() {
+        // MECHANICS PIN, not a usable de-fusion config: fireArm=LOWER fires on the change-metric lower
+        // arm (sMinus), which is structurally dead on real data (defusion spec §1). The real all-clear
+        // is the density-arm path (defusionEnabled), tested below. Kept to guard the max(0,S- - z - k)
+        // recursion + the fireArm=LOWER primary path. With z chosen far-negative (mu=1, change=0) the
+        // arm can be made to fire here; the direction of a lower-arm primary fire is DEFUSION.
         DetectorConfig reentry = new DetectorConfig(1.0, 5.0, 90.0, 0.5, 1.0, FireArm.LOWER);
         ChangeDetector d = ChangeDetectors.create(2, reentry, new Calibration(1.0, 0.1, 0.0));
         assertNull(d.onMatrix(m2(0.9)));
         ChangeSignal s = d.onMatrix(m2(0.9));     // change 0 -> z=-10 -> S-=9 > h=5; density(0.9)=1 >= 0
         assertTrue(s.sMinus() > reentry.h());
         assertTrue(s.fired());
+        assertEquals(FireDirection.DEFUSION, s.fireDirection());
         assertTrue(d.firstFire().isPresent());
+    }
+
+    // ---- de-fusion ("all-clear") path: density lower arm + was-fused latch + inverted gate ----
+    // (Oracle A2-A6 of initiative-s-defusion-rule-spec.md §6). 2x2 matrix => density in {0,1} exact.
+
+    /** A de-fusion-enabled crypto-shaped config: fusion on UPPER, de-fusion density arm enabled. */
+    private static DetectorConfig defusionConfig() {
+        return new DetectorConfig(1.0, 5.0, 90.0, 0.5, 1.0, FireArm.UPPER,
+                new DefusionConfig(1.0, 5.0, 25.0, true));
+    }
+
+    /**
+     * Calibration with both arms live: change mu=0/sigma=0.1, level gate L=0.5 (density 1 opens fusion),
+     * density mu=1.0/sigma=0.1, low gate L_low=0.5 (density 0 opens de-fusion).
+     */
+    private static Calibration defusionCalibration() {
+        return new Calibration(0.0, 0.1, 0.5, 1.0, 0.1, 0.5);
+    }
+
+    @Test
+    void onMatrix_DefusionBeforeAnyFusion_DoesNotFire_WasFusedLatch() {
+        // A2: density loosens (arm crosses h_d) but no fusion ever fired => wasFused false => no all-clear.
+        ChangeDetector d = ChangeDetectors.create(2, defusionConfig(), defusionCalibration());
+        assertNull(d.onMatrix(m2(0.9)));            // prime (density 1)
+        ChangeSignal s = d.onMatrix(m2(0.0));       // density 0 -> Sd- = (0-1)/0.1 = -10 => max(0,0+10-1)=9 > 5
+        assertTrue(s.sDensityMinus() > defusionConfig().defusion().h());
+        assertFalse(s.fired());                      // ...but no prior fusion: the all-clear cannot precede the alarm
+    }
+
+    @Test
+    void onMatrix_FusionThenDefusion_Alternates() {
+        // A3: fusion fires (density up), then de-fusion fires (density back down), clearing the latch.
+        ChangeDetector d = ChangeDetectors.create(2, defusionConfig(), defusionCalibration());
+        assertNull(d.onMatrix(m2(0.0)));            // prime (density 0)
+        ChangeSignal fusion = d.onMatrix(m2(0.9));  // change 0.9 -> z=9 -> S+=8 > 5; density 1 >= L -> FUSION
+        assertEquals(FireDirection.FUSION, fusion.fireDirection());
+        ChangeSignal defusion = d.onMatrix(m2(0.0)); // density 0 -> Sd-=9 > 5; density 0 <= L_low -> DEFUSION
+        assertEquals(FireDirection.DEFUSION, defusion.fireDirection());
+        assertTrue(defusion.sDensityMinus() > defusionConfig().defusion().h());
+    }
+
+    @Test
+    void onMatrix_DensityArmOpenButLevelNotLow_DoesNotDefuse_GateAnd() {
+        // A4: wasFused true and Sd- past h_d, but the low-level gate is shut (L_low set unreachable) -> no fire.
+        Calibration highBar = new Calibration(0.0, 0.1, 0.5, 1.0, 0.1, -1.0);  // L_low=-1: density 0 is NOT <= -1
+        ChangeDetector d = ChangeDetectors.create(2, defusionConfig(), highBar);
+        assertNull(d.onMatrix(m2(0.0)));
+        d.onMatrix(m2(0.9));                          // FUSION (sets wasFused)
+        ChangeSignal s = d.onMatrix(m2(0.0));         // Sd- grows past h_d, but density 0 > L_low(-1) -> gate shut
+        assertTrue(s.sDensityMinus() > defusionConfig().defusion().h());
+        assertFalse(s.fired());
+    }
+
+    @Test
+    void onMatrix_DefusionDisabledByDefault_NeverDefuses_Regression() {
+        // A5: the same fusion->density-drop stream under the default crypto() config (de-fusion OFF) never
+        // emits DEFUSION; the density arm is not even stepped.
+        ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.crypto(),
+                new Calibration(0.0, 0.1, 0.5, 1.0, 0.1, 0.5));
+        d.onMatrix(m2(0.0));
+        for (double r : new double[]{0.9, 0.0, 0.9, 0.0}) {
+            ChangeSignal s = d.onMatrix(m2(r));
+            assertNotEquals(FireDirection.DEFUSION, s.fireDirection());
+            assertEquals(0.0, s.sDensityMinus(), 1e-12);   // density arm inert when disabled
+        }
+    }
+
+    @Test
+    void onMatrix_ChangeMetricLowerArmLargeButDensityArmZero_DoesNotDefuse() {
+        // A6: defusion enabled, the change-metric lower arm sMinus is large (mu=1, change=0) but the
+        // density arm stays 0 (density never drops) -> no de-fusion. The re-entry signal is the density
+        // arm, not sMinus.
+        ChangeDetector d = ChangeDetectors.create(2, defusionConfig(),
+                new Calibration(1.0, 0.1, 0.5, 1.0, 0.1, 0.5));
+        assertNull(d.onMatrix(m2(0.9)));             // prime, density 1
+        ChangeSignal s = d.onMatrix(m2(0.9));        // change 0 -> sMinus grows; density stays 1 -> Sd- = max(0,0-0-1)=0
+        assertTrue(s.sMinus() > 0.0);
+        assertEquals(0.0, s.sDensityMinus(), 1e-12);
+        assertFalse(s.fired());
     }
 
     @Test

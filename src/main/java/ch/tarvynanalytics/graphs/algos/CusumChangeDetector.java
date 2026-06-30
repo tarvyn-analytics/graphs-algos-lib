@@ -3,6 +3,7 @@ package ch.tarvynanalytics.graphs.algos;
 import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 import ch.tarvynanalytics.graphs.algos.model.ChangeMetrics;
 import ch.tarvynanalytics.graphs.algos.model.ChangeSignal;
+import ch.tarvynanalytics.graphs.algos.model.FireDirection;
 
 import java.util.Optional;
 
@@ -11,6 +12,12 @@ import java.util.Optional;
  * ({@link ChangeMetricsEngine}) wired to the two-sided CUSUM ({@link CusumAccumulator}) and
  * the AND(level-gate, firing-arm) fire rule with one-fire-per-window debounce. See
  * {@link ChangeDetector} for the public contract and {@link ChangeDetectors} for construction.
+ *
+ * <p>The <strong>fusion</strong> (upper/primary arm) path is unchanged from v1. The
+ * <strong>de-fusion</strong> ("all-clear" / re-entry) path — a lower-arm CUSUM on the density series
+ * gated by a was-recently-fused latch and an inverted low-density gate — is <em>disabled by default</em>
+ * ({@code config.defusion().enabled() == false}) and is entirely inert in that case, so the pinned
+ * upper-arm behaviour cannot move. See {@code initiative-s-defusion-rule-spec.md}.</p>
  */
 final class CusumChangeDetector implements ChangeDetector {
 
@@ -21,7 +28,9 @@ final class CusumChangeDetector implements ChangeDetector {
 
     private double[][] previous;
     private long seq;
-    private boolean alreadyFired;
+    private boolean alreadyFiredPrimary;
+    private boolean alreadyFiredDefusion;
+    private boolean wasFused;
     private ChangeSignal firstFire;
     private boolean hasWindowId;
     private long currentWindowId;
@@ -33,7 +42,8 @@ final class CusumChangeDetector implements ChangeDetector {
         this.order = order;
         this.config = config;
         this.calibration = calibration;
-        this.cusum = new CusumAccumulator(calibration.mu(), calibration.sigma(), config.k());
+        this.cusum = new CusumAccumulator(calibration.mu(), calibration.sigma(), config.k(),
+                calibration.muDensity(), calibration.sigmaDensity(), config.defusion().k());
     }
 
     @Override
@@ -46,8 +56,12 @@ final class CusumChangeDetector implements ChangeDetector {
         if (hasWindowId && windowId != currentWindowId) {
             // spec §2.4 reset_ids: a new window re-arms the debounce and the firing arm only —
             // the previous matrix and the opposite arm are left intact (cf. onSessionBoundary()).
-            alreadyFired = false;
+            alreadyFiredPrimary = false;
             cusum.resetArm(config.fireArm());
+            if (config.defusion().enabled()) {
+                alreadyFiredDefusion = false;
+                cusum.resetDensityArm();
+            }
         }
         hasWindowId = true;
         currentWindowId = windowId;
@@ -66,35 +80,65 @@ final class CusumChangeDetector implements ChangeDetector {
         boolean gap = Double.isNaN(change);
 
         if (!gap) {
-            cusum.step(change);   // NaN-change gap: carry accumulators unchanged
+            cusum.step(change);   // NaN-change gap: carry the change accumulators unchanged
+        }
+
+        double density = metrics.densityLevel();
+        boolean defusionEnabled = config.defusion().enabled();
+        if (defusionEnabled && Double.isFinite(density)) {
+            // The density arm advances even on a change gap — density is observable from C_t alone.
+            cusum.stepDensity(density);
         }
 
         double sPlus = cusum.sPlus();
         double sMinus = cusum.sMinus();
+        double sDensityMinus = cusum.sDensityMinus();
 
-        boolean gateLevel = metrics.densityLevel() >= calibration.level();   // NaN density => false
+        // Primary (fireArm-selected) fire: AND(level gate, firing arm > h), debounced. Unchanged.
+        boolean gateLevel = density >= calibration.level();   // NaN density => false
         double firingArm = config.fireArm() == FireArm.UPPER ? sPlus : sMinus;
-        boolean gateCusum = firingArm > config.h();
-        boolean fire = !alreadyFired && !gap && gateLevel && gateCusum;
+        boolean firePrimary = !alreadyFiredPrimary && !gap && gateLevel && firingArm > config.h();
 
-        ChangeSignal signal = new ChangeSignal(seq++, metrics, sPlus, sMinus, fire);
+        // De-fusion fire: only after a fusion fire (wasFused), with the inverted low-density gate and
+        // the density lower arm past its threshold. Inert unless enabled.
+        boolean gateLow = Double.isFinite(density) && density <= calibration.lowLevel();
+        boolean fireDefusion = defusionEnabled && wasFused && !alreadyFiredDefusion
+                && gateLow && sDensityMinus > config.defusion().h();
 
-        if (fire) {
-            alreadyFired = true;
-            cusum.resetArm(config.fireArm());   // debounce: reset the firing arm after firing
-            if (firstFire == null) {
-                firstFire = signal;
-            }
+        FireDirection direction = fireDirection(firePrimary, fireDefusion);
+        ChangeSignal signal = new ChangeSignal(seq++, metrics, sPlus, sMinus, sDensityMinus, direction);
+
+        if (firePrimary) {
+            alreadyFiredPrimary = true;
+            cusum.resetArm(config.fireArm());
+            wasFused = config.fireArm() == FireArm.UPPER;   // a fusion fire arms the all-clear; a lower fire clears it
+        } else if (fireDefusion) {
+            alreadyFiredDefusion = true;
+            wasFused = false;                                // all-clear sounded; require a new fusion next
+            cusum.resetDensityArm();
+        }
+        if (direction != FireDirection.NONE && firstFire == null) {
+            firstFire = signal;
         }
         previous = copy(correlation);
         return signal;
+    }
+
+    /** FUSION takes precedence over DEFUSION when both somehow trip (their gates are disjoint in practice). */
+    private FireDirection fireDirection(boolean firePrimary, boolean fireDefusion) {
+        if (firePrimary) {
+            return config.fireArm() == FireArm.UPPER ? FireDirection.FUSION : FireDirection.DEFUSION;
+        }
+        return fireDefusion ? FireDirection.DEFUSION : FireDirection.NONE;
     }
 
     @Override
     public void onSessionBoundary() {
         previous = null;
         cusum.reset();
-        alreadyFired = false;
+        alreadyFiredPrimary = false;
+        alreadyFiredDefusion = false;
+        wasFused = false;
         hasWindowId = false;   // the boundary is itself the reset; the next windowed call must not re-arm again
     }
 

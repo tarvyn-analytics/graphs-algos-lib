@@ -22,10 +22,13 @@ import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
  * @param edgeThreshold edge magnitude threshold {@code τ}; an edge exists where {@code |r| > τ}
  * @param epsilonSigma  floor applied to the calm sigma when the calm block is degenerate/constant
  *                      (must be {@code > 0}); prevents divide-by-zero and spurious firing
- * @param fireArm       which CUSUM arm opens an alert in this configuration (v1: {@link FireArm#UPPER})
+ * @param fireArm       which CUSUM arm opens the primary alert in this configuration (v1: {@link FireArm#UPPER})
+ * @param defusion      the de-fusion ("all-clear" / re-entry) sub-tuning (disabled by default; see
+ *                      {@link DefusionConfig})
  */
 public record DetectorConfig(double k, double h, double levelPctile,
-                             double edgeThreshold, double epsilonSigma, FireArm fireArm) {
+                             double edgeThreshold, double epsilonSigma, FireArm fireArm,
+                             DefusionConfig defusion) {
 
     /**
      * Validates the tuning constants; rejects non-finite or out-of-range values so a
@@ -47,25 +50,48 @@ public record DetectorConfig(double k, double h, double levelPctile,
         if (fireArm == null) {
             throw new IllegalArgumentException("fireArm must not be null");
         }
+        if (defusion == null) {
+            throw new IllegalArgumentException("defusion config must not be null");
+        }
+    }
+
+    /**
+     * Backward-compatible constructor with de-fusion {@link DefusionConfig#disabled() disabled} — the
+     * fusion-only configuration used everywhere before de-fusion existed.
+     *
+     * @param k             CUSUM reference value
+     * @param h             CUSUM decision interval
+     * @param levelPctile   calm-density percentile for the level gate
+     * @param edgeThreshold edge magnitude threshold {@code τ}
+     * @param epsilonSigma  degenerate-calm sigma floor
+     * @param fireArm       which arm opens the primary alert
+     */
+    public DetectorConfig(double k, double h, double levelPctile,
+                          double edgeThreshold, double epsilonSigma, FireArm fireArm) {
+        this(k, h, levelPctile, edgeThreshold, epsilonSigma, fireArm, DefusionConfig.disabled());
     }
 
     /**
      * The settled crypto constants (crypto-n8-verdict / the spike recalibration):
      * {@code k=1.5, h=8.0, levelPctile=99.0, τ=0.5, epsilonSigma=1.0}, firing on the upper arm.
+     * De-fusion firing is disabled (see {@link DefusionConfig}).
      *
      * @return a crypto-tuned configuration
      */
     public static DetectorConfig crypto() {
-        return new DetectorConfig(1.5, 8.0, 99.0, 0.5, 1.0, FireArm.UPPER);
+        return new DetectorConfig(1.5, 8.0, 99.0, 0.5, 1.0, FireArm.UPPER,
+                new DefusionConfig(1.5, 8.0, 25.0, false));
     }
 
     /**
      * The original {@code replay_alert} equity constants:
      * {@code k=1.0, h=5.0, levelPctile=90.0, τ=0.5, epsilonSigma=1.0}, firing on the upper arm.
+     * De-fusion firing is disabled (see {@link DefusionConfig}).
      *
      * @return an equity-tuned configuration
      */
     public static DetectorConfig equity() {
-        return new DetectorConfig(1.0, 5.0, 90.0, 0.5, 1.0, FireArm.UPPER);
+        return new DetectorConfig(1.0, 5.0, 90.0, 0.5, 1.0, FireArm.UPPER,
+                new DefusionConfig(1.0, 5.0, 25.0, false));
     }
 }
