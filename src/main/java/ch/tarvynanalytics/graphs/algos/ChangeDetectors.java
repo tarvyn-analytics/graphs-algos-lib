@@ -79,7 +79,17 @@ public final class ChangeDetectors {
         }
         double level = nearestRankPercentile(densities, config.levelPctile());
 
-        return new Calibration(mu, sigma, level);
+        // De-fusion arm: mean/sigma of the calm DENSITY series (a different series than the change
+        // CUSUM) plus the inverted low-density confirmation gate. Always computed so enabling de-fusion
+        // is a config flip, not a re-calibration; harmless when de-fusion is disabled (never stepped).
+        double muDensity = mean(densities);
+        double sigmaDensity = isConstant(densities) ? 0.0 : populationStdDev(densities, muDensity);
+        if (sigmaDensity == 0.0) {
+            sigmaDensity = config.epsilonSigma();
+        }
+        double lowLevel = nearestRankPercentile(densities, config.defusion().lowLevelPctile());
+
+        return new Calibration(mu, sigma, level, muDensity, sigmaDensity, lowLevel);
     }
 
     private static double[] finiteOnly(double[] values) {
