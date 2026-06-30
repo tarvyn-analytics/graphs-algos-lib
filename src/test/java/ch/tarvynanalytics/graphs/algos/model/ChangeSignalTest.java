@@ -24,7 +24,7 @@ class ChangeSignalTest {
         assertEquals(m, s.metrics());
         assertEquals(9.4, s.sPlus());
         assertEquals(0.0, s.sMinus());
-        assertEquals(0.0, s.sDensityMinus());
+        assertEquals(0.0, s.recoveryGauge());
         assertEquals(FireDirection.FUSION, s.fireDirection());
         assertTrue(s.fired());
     }
@@ -33,7 +33,7 @@ class ChangeSignalTest {
     void fired_IsDerivedFromFireDirection() {
         assertFalse(new ChangeSignal(0L, metrics(), 0.0, 0.0, 0.0, FireDirection.NONE).fired());
         assertTrue(new ChangeSignal(0L, metrics(), 0.0, 0.0, 0.0, FireDirection.FUSION).fired());
-        assertTrue(new ChangeSignal(0L, metrics(), 0.0, 0.0, 9.0, FireDirection.DEFUSION).fired());
+        assertTrue(new ChangeSignal(0L, metrics(), 0.0, 0.0, 0.85, FireDirection.DEFUSION).fired());
     }
 
     @Test

@@ -79,17 +79,17 @@ public final class ChangeDetectors {
         }
         double level = nearestRankPercentile(densities, config.levelPctile());
 
-        // De-fusion arm: mean/sigma of the calm DENSITY series (a different series than the change
-        // CUSUM) plus the inverted low-density confirmation gate. Always computed so enabling de-fusion
-        // is a config flip, not a re-calibration; harmless when de-fusion is disabled (never stepped).
+        // De-fusion recovery gauge: mean/sigma of the calm DENSITY series (a different series than the
+        // change CUSUM), which form the calm band L_band = muDensity + bandC*sigmaDensity. Always computed
+        // so enabling de-fusion is a config flip, not a re-calibration; harmless when firing is disabled
+        // (the gauge is still emitted, but no DEFUSION can fire).
         double muDensity = mean(densities);
         double sigmaDensity = isConstant(densities) ? 0.0 : populationStdDev(densities, muDensity);
         if (sigmaDensity == 0.0) {
             sigmaDensity = config.epsilonSigma();
         }
-        double lowLevel = nearestRankPercentile(densities, config.defusion().lowLevelPctile());
 
-        return new Calibration(mu, sigma, level, muDensity, sigmaDensity, lowLevel);
+        return new Calibration(mu, sigma, level, muDensity, sigmaDensity);
     }
 
     private static double[] finiteOnly(double[] values) {

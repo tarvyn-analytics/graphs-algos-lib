@@ -70,11 +70,11 @@ class DetectorConfigTest {
     void factories_HaveDefusionDisabledByDefault() {
         assertFalse(DetectorConfig.crypto().defusion().enabled());
         assertFalse(DetectorConfig.equity().defusion().enabled());
-        // crypto mirrors the fusion k/h; equity mirrors its own.
-        assertEquals(1.5, DetectorConfig.crypto().defusion().k());
-        assertEquals(8.0, DetectorConfig.crypto().defusion().h());
-        assertEquals(25.0, DetectorConfig.crypto().defusion().lowLevelPctile());
-        assertEquals(1.0, DetectorConfig.equity().defusion().k());
+        // both carry the settled recovery-gauge defaults (firing off; the gauge is still computed).
+        assertEquals(0.75, DetectorConfig.crypto().defusion().bandC());
+        assertEquals(0.80, DetectorConfig.crypto().defusion().theta());
+        assertEquals(96, DetectorConfig.crypto().defusion().gaugeWindowSamples());
+        assertEquals(DefusionConfig.disabled(), DetectorConfig.equity().defusion());
     }
 
     @Test

@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The {@link Calibration} record's sigma {@code > 0} guard (spec §2.1) and de-fusion fields. */
+/** The {@link Calibration} record's sigma {@code > 0} guard (spec §2.1) and de-fusion density fields. */
 class CalibrationTest {
 
     @Test
@@ -19,19 +19,17 @@ class CalibrationTest {
     }
 
     @Test
-    void threeArgConstructor_LeavesDefusionFieldsNaN_Inert() {
+    void threeArgConstructor_LeavesDensityFieldsNaN_Inert() {
         Calibration c = new Calibration(0.1, 0.05, 0.9);
         assertTrue(Double.isNaN(c.muDensity()));
         assertTrue(Double.isNaN(c.sigmaDensity()));
-        assertTrue(Double.isNaN(c.lowLevel()));
     }
 
     @Test
-    void sixArgConstructor_ExposesDefusionFields() {
-        Calibration c = new Calibration(0.1, 0.05, 0.9, 0.7, 0.12, 0.25);
+    void fiveArgConstructor_ExposesDensityFields() {
+        Calibration c = new Calibration(0.1, 0.05, 0.9, 0.7, 0.12);
         assertEquals(0.7, c.muDensity());
         assertEquals(0.12, c.sigmaDensity());
-        assertEquals(0.25, c.lowLevel());
     }
 
     @Test

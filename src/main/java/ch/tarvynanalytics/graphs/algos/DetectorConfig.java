@@ -80,7 +80,7 @@ public record DetectorConfig(double k, double h, double levelPctile,
      */
     public static DetectorConfig crypto() {
         return new DetectorConfig(1.5, 8.0, 99.0, 0.5, 1.0, FireArm.UPPER,
-                new DefusionConfig(1.5, 8.0, 25.0, false));
+                DefusionConfig.disabled());
     }
 
     /**
@@ -92,6 +92,6 @@ public record DetectorConfig(double k, double h, double levelPctile,
      */
     public static DetectorConfig equity() {
         return new DetectorConfig(1.0, 5.0, 90.0, 0.5, 1.0, FireArm.UPPER,
-                new DefusionConfig(1.0, 5.0, 25.0, false));
+                DefusionConfig.disabled());
     }
 }

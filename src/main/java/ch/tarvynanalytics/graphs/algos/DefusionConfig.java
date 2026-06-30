@@ -3,51 +3,55 @@ package ch.tarvynanalytics.graphs.algos;
 import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 
 /**
- * The de-fusion ("all-clear" / re-entry) sub-tuning of a {@link DetectorConfig}. De-fusion is a
- * lower-arm CUSUM on the <em>density</em> series (structure loosening back), gated by a
- * was-recently-fused latch and an inverted low-density confirmation gate — a different series and
- * gate than the fusion arm, so it cannot be expressed by {@link FireArm} alone (see
- * {@code initiative-s-defusion-rule-spec.md} §1–§3 for why the lower arm on the change metric is
- * structurally dead).
+ * The de-fusion ("all-clear" / re-entry) sub-tuning of a {@link DetectorConfig}. The all-clear is a
+ * <strong>recovery gauge</strong> — the trailing fraction of a window the density series has spent back
+ * in the calm band ({@code density ≤ L_band}, with {@code L_band = μ_D + bandC·σ_D}) — and a binary fire
+ * when that gauge crosses {@link #theta()}, gated by a was-recently-fused latch and a full-window
+ * confirmation (see {@link RecoveryGauge}, {@link CusumChangeDetector}, and
+ * {@code initiative-s-defusion-gauge-spec.md}). This supersedes the earlier density-lower-arm CUSUM,
+ * which was falsified on real recovery data (it detected departure <em>below</em> the calm baseline, not
+ * the fused→calm return); the gauge is the validated primitive.
  *
- * <p><strong>Disabled by default</strong> ({@link #disabled()}): the de-fusion path is unvalidatable
- * on data without a post-event recovery phase, so it stays off until a market with a real recovery
- * phase justifies enabling it. When disabled, the entire de-fusion branch of the detector is inert
- * and the upper/fusion fire behaviour is byte-for-byte unchanged.</p>
+ * <p><strong>Firing is disabled by default</strong> ({@link #disabled()}): the gauge is always computed
+ * and emitted (informational), but the binary all-clear stays off until a market is validated. When
+ * disabled, the entire de-fusion fire branch of the detector is inert and the upper/fusion fire behaviour
+ * is byte-for-byte unchanged.</p>
  *
- * @param k              de-fusion CUSUM reference value, in calm-density-sigma units ({@code >= 0})
- * @param h              de-fusion CUSUM decision interval, in calm-density-sigma units ({@code > 0})
- * @param lowLevelPctile a <em>low</em> percentile of the calm density series for the inverted
- *                       confirmation gate {@code L_low} (the all-clear must return density to a low
- *                       calm level), in {@code [0, 100]}
- * @param enabled        whether de-fusion firing is active (default {@code false})
+ * @param bandC             the calm-band width: {@code L_band = μ_D + bandC·σ_D} ({@code >= 0})
+ * @param theta             the all-clear gauge threshold — the in-band fraction that opens the alert,
+ *                          in {@code [0, 1]}
+ * @param gaugeWindowSamples the gauge window length {@code N_g} in samples ({@code >= 1}); the caller
+ *                          derives it from the time window {@code W_g} and the sampling cadence (e.g.
+ *                          48 h at a 30-min cadence is {@code 96}), keeping the library cadence-agnostic
+ * @param enabled           whether the binary all-clear fire is active (default {@code false})
  */
-public record DefusionConfig(double k, double h, double lowLevelPctile, boolean enabled) {
+public record DefusionConfig(double bandC, double theta, int gaugeWindowSamples, boolean enabled) {
 
     /**
      * Validates the de-fusion tuning (mirrors {@link DetectorConfig}'s checks) so a misconfiguration
      * fails loudly at construction.
      */
     public DefusionConfig {
-        if (!(k >= 0)) {
-            throw new InvalidInputException("kDefusion must be >= 0; got [" + k + "]");
+        if (!(bandC >= 0)) {
+            throw new InvalidInputException("bandC must be >= 0; got [" + bandC + "]");
         }
-        if (!(h > 0)) {
-            throw new InvalidInputException("hDefusion must be > 0; got [" + h + "]");
+        if (!(theta >= 0 && theta <= 1)) {
+            throw new InvalidInputException("theta must be in [0,1]; got [" + theta + "]");
         }
-        if (!(lowLevelPctile >= 0 && lowLevelPctile <= 100)) {
-            throw new InvalidInputException("lowLevelPctile must be in [0,100]; got [" + lowLevelPctile + "]");
+        if (gaugeWindowSamples < 1) {
+            throw new InvalidInputException("gaugeWindowSamples must be >= 1; got [" + gaugeWindowSamples + "]");
         }
     }
 
     /**
-     * The default disabled de-fusion tuning ({@code k=1.0, h=5.0, lowLevelPctile=25, enabled=false}).
-     * The constants are inert while {@code enabled} is {@code false}; they are sensible starting
-     * points for when de-fusion is later enabled and re-validated.
+     * The default disabled de-fusion tuning ({@code bandC=0.75, theta=0.80, gaugeWindowSamples=96,
+     * enabled=false}). The constants are the settled crypto gauge (a 48 h window at a 30-min cadence;
+     * θ=0.80 fires genuine recoveries and suppresses transient re-fusing dips, see the gauge spec §2.2);
+     * the gauge is still computed while disabled, only the binary fire is off.
      *
-     * @return a disabled de-fusion configuration
+     * @return a firing-disabled de-fusion configuration
      */
     public static DefusionConfig disabled() {
-        return new DefusionConfig(1.0, 5.0, 25.0, false);
+        return new DefusionConfig(0.75, 0.80, 96, false);
     }
 }

@@ -14,10 +14,12 @@ import java.util.Optional;
  * {@link ChangeDetector} for the public contract and {@link ChangeDetectors} for construction.
  *
  * <p>The <strong>fusion</strong> (upper/primary arm) path is unchanged from v1. The
- * <strong>de-fusion</strong> ("all-clear" / re-entry) path — a lower-arm CUSUM on the density series
- * gated by a was-recently-fused latch and an inverted low-density gate — is <em>disabled by default</em>
- * ({@code config.defusion().enabled() == false}) and is entirely inert in that case, so the pinned
- * upper-arm behaviour cannot move. See {@code initiative-s-defusion-rule-spec.md}.</p>
+ * <strong>de-fusion</strong> ("all-clear" / re-entry) path is the {@link RecoveryGauge} — the trailing
+ * in-band occupancy of the density series — which fires when the gauge crosses {@code θ} with a full
+ * window, gated by a was-recently-fused latch. The gauge is <em>always computed and emitted</em>
+ * (informational); the binary fire is <em>disabled by default</em> ({@code config.defusion().enabled()
+ * == false}) and entirely inert in that case, so the pinned upper-arm behaviour cannot move. See
+ * {@code initiative-s-defusion-gauge-spec.md}.</p>
  */
 final class CusumChangeDetector implements ChangeDetector {
 
@@ -25,6 +27,8 @@ final class CusumChangeDetector implements ChangeDetector {
     private final DetectorConfig config;
     private final Calibration calibration;
     private final CusumAccumulator cusum;
+    private final RecoveryGauge gauge;
+    private final double lBand;
 
     private double[][] previous;
     private long seq;
@@ -42,8 +46,10 @@ final class CusumChangeDetector implements ChangeDetector {
         this.order = order;
         this.config = config;
         this.calibration = calibration;
-        this.cusum = new CusumAccumulator(calibration.mu(), calibration.sigma(), config.k(),
-                calibration.muDensity(), calibration.sigmaDensity(), config.defusion().k());
+        this.cusum = new CusumAccumulator(calibration.mu(), calibration.sigma(), config.k());
+        this.gauge = new RecoveryGauge(config.defusion().gaugeWindowSamples());
+        // The calm band L_band = μ_D + bandC·σ_D; NaN when de-fusion is uncalibrated (gauge stays NaN/inert).
+        this.lBand = calibration.muDensity() + config.defusion().bandC() * calibration.sigmaDensity();
     }
 
     @Override
@@ -59,8 +65,9 @@ final class CusumChangeDetector implements ChangeDetector {
             alreadyFiredPrimary = false;
             cusum.resetArm(config.fireArm());
             if (config.defusion().enabled()) {
+                // Re-arm the de-fusion debounce only; the gauge buffer (a trailing occupancy) is data
+                // state, kept across the window boundary like the previous matrix and the opposite arm.
                 alreadyFiredDefusion = false;
-                cusum.resetDensityArm();
             }
         }
         hasWindowId = true;
@@ -85,37 +92,42 @@ final class CusumChangeDetector implements ChangeDetector {
 
         double density = metrics.densityLevel();
         boolean defusionEnabled = config.defusion().enabled();
-        if (defusionEnabled && Double.isFinite(density)) {
-            // The density arm advances even on a change gap — density is observable from C_t alone.
-            cusum.stepDensity(density);
+
+        // Recovery gauge: the trailing in-band occupancy. Computed whenever de-fusion is calibrated
+        // (L_band finite), independent of whether firing is enabled — it is the always-emitted recovery
+        // track. The gauge advances even on a change gap: density is observable from C_t alone.
+        boolean inBand = Double.isFinite(lBand) && Double.isFinite(density) && density <= lBand;
+        if (Double.isFinite(lBand) && Double.isFinite(density)) {
+            gauge.push(inBand);
         }
+        double recoveryGauge = gauge.value();
 
         double sPlus = cusum.sPlus();
         double sMinus = cusum.sMinus();
-        double sDensityMinus = cusum.sDensityMinus();
 
         // Primary (fireArm-selected) fire: AND(level gate, firing arm > h), debounced. Unchanged.
         boolean gateLevel = density >= calibration.level();   // NaN density => false
         double firingArm = config.fireArm() == FireArm.UPPER ? sPlus : sMinus;
         boolean firePrimary = !alreadyFiredPrimary && !gap && gateLevel && firingArm > config.h();
 
-        // De-fusion fire: only after a fusion fire (wasFused), with the inverted low-density gate and
-        // the density lower arm past its threshold. Inert unless enabled.
-        boolean gateLow = Double.isFinite(density) && density <= calibration.lowLevel();
+        // De-fusion fire: only after a fusion fire (wasFused), once a full gauge window has filled and the
+        // gauge crosses θ with the current sample itself back in the calm band. Inert unless enabled.
         boolean fireDefusion = defusionEnabled && wasFused && !alreadyFiredDefusion
-                && gateLow && sDensityMinus > config.defusion().h();
+                && gauge.windowFull() && recoveryGauge >= config.defusion().theta() && inBand;
 
         FireDirection direction = fireDirection(firePrimary, fireDefusion);
-        ChangeSignal signal = new ChangeSignal(seq++, metrics, sPlus, sMinus, sDensityMinus, direction);
+        ChangeSignal signal = new ChangeSignal(seq++, metrics, sPlus, sMinus, recoveryGauge, direction);
 
         if (firePrimary) {
             alreadyFiredPrimary = true;
             cusum.resetArm(config.fireArm());
             wasFused = config.fireArm() == FireArm.UPPER;   // a fusion fire arms the all-clear; a lower fire clears it
+            if (wasFused) {
+                gauge.reset();                              // re-anchor the recovery gauge at this fusion
+            }
         } else if (fireDefusion) {
             alreadyFiredDefusion = true;
             wasFused = false;                                // all-clear sounded; require a new fusion next
-            cusum.resetDensityArm();
         }
         if (direction != FireDirection.NONE && firstFire == null) {
             firstFire = signal;
@@ -136,6 +148,7 @@ final class CusumChangeDetector implements ChangeDetector {
     public void onSessionBoundary() {
         previous = null;
         cusum.reset();
+        gauge.reset();
         alreadyFiredPrimary = false;
         alreadyFiredDefusion = false;
         wasFused = false;
