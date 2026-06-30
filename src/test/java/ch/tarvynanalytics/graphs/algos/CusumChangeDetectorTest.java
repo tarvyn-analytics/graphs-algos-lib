@@ -68,7 +68,7 @@ class CusumChangeDetectorTest {
     }
 
     @Test
-    void onMatrix_DefusionArmIsComputedAndEmitted() {
+    void onMatrix_ChangeMetricLowerArm_IsComputedAndEmitted() {
         // mu=1.0, a flat change of 0 gives z=-10 -> S- grows, S+ stays 0.
         ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.equity(), new Calibration(1.0, 0.1, 2.0));
         d.onMatrix(m2(0.0));
@@ -95,82 +95,105 @@ class CusumChangeDetectorTest {
         assertTrue(d.firstFire().isPresent());
     }
 
-    // ---- de-fusion ("all-clear") path: density lower arm + was-fused latch + inverted gate ----
-    // (Oracle A2-A6 of initiative-s-defusion-rule-spec.md §6). 2x2 matrix => density in {0,1} exact.
+    // ---- de-fusion ("all-clear") path: the recovery gauge + was-fused latch + full-window confirmation ----
+    // (Oracle A2-A6 of initiative-s-defusion-gauge-spec.md §6). 2x2 matrix => density in {0,1} exact.
+    // muDensity=0.2, sigmaDensity=0.4, bandC=0.75 => L_band=0.5: density 0 in-band, density 1 out-of-band.
+    // Gauge window N_g=4 and theta=0.75 give hand-computable fractions.
 
-    /** A de-fusion-enabled crypto-shaped config: fusion on UPPER, de-fusion density arm enabled. */
+    /** A de-fusion-enabled crypto-shaped config: fusion on UPPER, gauge N_g=4, theta=0.75. */
     private static DetectorConfig defusionConfig() {
         return new DetectorConfig(1.0, 5.0, 90.0, 0.5, 1.0, FireArm.UPPER,
-                new DefusionConfig(1.0, 5.0, 25.0, true));
+                new DefusionConfig(0.75, 0.75, 4, true));
     }
 
-    /**
-     * Calibration with both arms live: change mu=0/sigma=0.1, level gate L=0.5 (density 1 opens fusion),
-     * density mu=1.0/sigma=0.1, low gate L_low=0.5 (density 0 opens de-fusion).
-     */
+    /** change mu=0/sigma=0.1, level gate L=0.5 (density 1 opens fusion); muDensity=0.2/sigmaDensity=0.4 -> L_band=0.5. */
     private static Calibration defusionCalibration() {
-        return new Calibration(0.0, 0.1, 0.5, 1.0, 0.1, 0.5);
+        return new Calibration(0.0, 0.1, 0.5, 0.2, 0.4);
     }
 
     @Test
     void onMatrix_DefusionBeforeAnyFusion_DoesNotFire_WasFusedLatch() {
-        // A2: density loosens (arm crosses h_d) but no fusion ever fired => wasFused false => no all-clear.
+        // A2: the gauge fills to 1.0 with a full window (density back in the band), but no fusion ever
+        // fired => wasFused false => the all-clear cannot precede the alarm.
         ChangeDetector d = ChangeDetectors.create(2, defusionConfig(), defusionCalibration());
-        assertNull(d.onMatrix(m2(0.9)));            // prime (density 1)
-        ChangeSignal s = d.onMatrix(m2(0.0));       // density 0 -> Sd- = (0-1)/0.1 = -10 => max(0,0+10-1)=9 > 5
-        assertTrue(s.sDensityMinus() > defusionConfig().defusion().h());
-        assertFalse(s.fired());                      // ...but no prior fusion: the all-clear cannot precede the alarm
+        assertNull(d.onMatrix(m2(0.0)));            // prime (density 0)
+        ChangeSignal s = null;
+        for (int i = 0; i < 4; i++) {
+            s = d.onMatrix(m2(0.0));                // 4 in-band samples: gauge -> 1.0, window full at the 4th
+        }
+        assertEquals(1.0, s.recoveryGauge(), 1e-12);
+        assertFalse(s.fired());                      // full, saturated gauge, but no prior fusion => no all-clear
     }
 
     @Test
     void onMatrix_FusionThenDefusion_Alternates() {
-        // A3: fusion fires (density up), then de-fusion fires (density back down), clearing the latch.
+        // A3: fusion fires (density up), then after a full gauge window of in-band samples the all-clear
+        // fires (gauge 1.0 >= theta), clearing the latch. The full-window guard delays the fire from the
+        // first in-band sample (gauge already 1.0) to the fourth (window full).
         ChangeDetector d = ChangeDetectors.create(2, defusionConfig(), defusionCalibration());
         assertNull(d.onMatrix(m2(0.0)));            // prime (density 0)
         ChangeSignal fusion = d.onMatrix(m2(0.9));  // change 0.9 -> z=9 -> S+=8 > 5; density 1 >= L -> FUSION
         assertEquals(FireDirection.FUSION, fusion.fireDirection());
-        ChangeSignal defusion = d.onMatrix(m2(0.0)); // density 0 -> Sd-=9 > 5; density 0 <= L_low -> DEFUSION
-        assertEquals(FireDirection.DEFUSION, defusion.fireDirection());
-        assertTrue(defusion.sDensityMinus() > defusionConfig().defusion().h());
-    }
-
-    @Test
-    void onMatrix_DensityArmOpenButLevelNotLow_DoesNotDefuse_GateAnd() {
-        // A4: wasFused true and Sd- past h_d, but the low-level gate is shut (L_low set unreachable) -> no fire.
-        Calibration highBar = new Calibration(0.0, 0.1, 0.5, 1.0, 0.1, -1.0);  // L_low=-1: density 0 is NOT <= -1
-        ChangeDetector d = ChangeDetectors.create(2, defusionConfig(), highBar);
-        assertNull(d.onMatrix(m2(0.0)));
-        d.onMatrix(m2(0.9));                          // FUSION (sets wasFused)
-        ChangeSignal s = d.onMatrix(m2(0.0));         // Sd- grows past h_d, but density 0 > L_low(-1) -> gate shut
-        assertTrue(s.sDensityMinus() > defusionConfig().defusion().h());
-        assertFalse(s.fired());
-    }
-
-    @Test
-    void onMatrix_DefusionDisabledByDefault_NeverDefuses_Regression() {
-        // A5: the same fusion->density-drop stream under the default crypto() config (de-fusion OFF) never
-        // emits DEFUSION; the density arm is not even stepped.
-        ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.crypto(),
-                new Calibration(0.0, 0.1, 0.5, 1.0, 0.1, 0.5));
-        d.onMatrix(m2(0.0));
-        for (double r : new double[]{0.9, 0.0, 0.9, 0.0}) {
-            ChangeSignal s = d.onMatrix(m2(r));
+        assertEquals(0.0, fusion.recoveryGauge(), 1e-12);   // density 1 out-of-band; gauge re-anchored after
+        for (int i = 0; i < 3; i++) {
+            ChangeSignal s = d.onMatrix(m2(0.0));   // 3 in-band samples: gauge 1.0 but window not yet full
+            assertEquals(1.0, s.recoveryGauge(), 1e-12);
             assertNotEquals(FireDirection.DEFUSION, s.fireDirection());
-            assertEquals(0.0, s.sDensityMinus(), 1e-12);   // density arm inert when disabled
+        }
+        ChangeSignal defusion = d.onMatrix(m2(0.0)); // 4th in-band sample: window full -> DEFUSION
+        assertEquals(FireDirection.DEFUSION, defusion.fireDirection());
+        assertEquals(1.0, defusion.recoveryGauge(), 1e-12);
+    }
+
+    @Test
+    void onMatrix_GaugeFullAndOverThetaButSampleOutOfBand_DoesNotDefuse_GateAnd() {
+        // A4: wasFused true, window full and gauge=0.75 >= theta, but the CURRENT sample is out-of-band
+        // (density 1) => no fire; the next in-band sample (gauge still 0.75) then fires. Pins the AND gate.
+        ChangeDetector d = ChangeDetectors.create(2, defusionConfig(), defusionCalibration());
+        assertNull(d.onMatrix(m2(0.0)));
+        d.onMatrix(m2(0.9));                          // FUSION (sets wasFused, re-anchors gauge)
+        d.onMatrix(m2(0.0));                          // post-fusion in-band #1 (gauge 1/1)
+        d.onMatrix(m2(0.0));                          // #2 (2/2)
+        d.onMatrix(m2(0.0));                          // #3 (3/3)
+        ChangeSignal out = d.onMatrix(m2(0.9));       // #4 density 1: window full, gauge mean[T,T,T,F]=0.75, but out-of-band
+        assertEquals(0.75, out.recoveryGauge(), 1e-12);
+        assertNotEquals(FireDirection.DEFUSION, out.fireDirection());
+        ChangeSignal back = d.onMatrix(m2(0.0));      // density 0: gauge mean[T,T,F,T]=0.75, in-band -> DEFUSION
+        assertEquals(0.75, back.recoveryGauge(), 1e-12);
+        assertEquals(FireDirection.DEFUSION, back.fireDirection());
+    }
+
+    @Test
+    void onMatrix_DefusionDisabledByDefault_NeverDefuses_ButGaugeStillComputed_Regression() {
+        // A5: the same fusion->recovery stream under the default crypto() config (firing OFF) never emits
+        // DEFUSION, yet the gauge IS still computed (informational, independent of the enabled flag).
+        // sigma=0.08 makes z=11.25 so a single step clears crypto's h=8 (k=1.5) and fusion fires.
+        ChangeDetector d = ChangeDetectors.create(2, DetectorConfig.crypto(),
+                new Calibration(0.0, 0.08, 0.5, 0.2, 0.4));
+        d.onMatrix(m2(0.0));
+        ChangeSignal fusion = d.onMatrix(m2(0.9));    // S+=9.75>8, density 1 >= L -> FUSION (re-anchors the gauge)
+        assertEquals(FireDirection.FUSION, fusion.fireDirection());
+        for (int i = 0; i < 5; i++) {
+            ChangeSignal s = d.onMatrix(m2(0.0));     // in-band recovery samples
+            assertNotEquals(FireDirection.DEFUSION, s.fireDirection());
+            assertEquals(1.0, s.recoveryGauge(), 1e-12);   // gauge climbs to 1.0 even though firing is OFF
         }
     }
 
     @Test
-    void onMatrix_ChangeMetricLowerArmLargeButDensityArmZero_DoesNotDefuse() {
-        // A6: defusion enabled, the change-metric lower arm sMinus is large (mu=1, change=0) but the
-        // density arm stays 0 (density never drops) -> no de-fusion. The re-entry signal is the density
-        // arm, not sMinus.
+    void onMatrix_DensityHoldsAtPlateau_GaugeStaysLow_DoesNotDefuse() {
+        // A6: de-fusion enabled and the change-metric lower arm sMinus is large (mu=1, change=0), but
+        // density holds at the plateau (1, out-of-band) so the gauge never enters the band -> no all-clear.
+        // The re-entry trigger is the gauge occupancy, not sMinus.
         ChangeDetector d = ChangeDetectors.create(2, defusionConfig(),
-                new Calibration(1.0, 0.1, 0.5, 1.0, 0.1, 0.5));
+                new Calibration(1.0, 0.1, 0.5, 0.2, 0.4));
         assertNull(d.onMatrix(m2(0.9)));             // prime, density 1
-        ChangeSignal s = d.onMatrix(m2(0.9));        // change 0 -> sMinus grows; density stays 1 -> Sd- = max(0,0-0-1)=0
+        ChangeSignal s = null;
+        for (int i = 0; i < 5; i++) {
+            s = d.onMatrix(m2(0.9));                  // change 0 -> sMinus grows; density stays 1 (out-of-band)
+        }
         assertTrue(s.sMinus() > 0.0);
-        assertEquals(0.0, s.sDensityMinus(), 1e-12);
+        assertEquals(0.0, s.recoveryGauge(), 1e-12); // gauge never in-band
         assertFalse(s.fired());
     }
 

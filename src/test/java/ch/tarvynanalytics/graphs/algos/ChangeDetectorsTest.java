@@ -40,8 +40,7 @@ class ChangeDetectorsTest {
         double[] change = {0.0, 2.0};
         double[] density = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
         Calibration cal = ChangeDetectors.calibrate(change, density, DetectorConfig.crypto());
-        assertEquals(5.5, cal.muDensity(), 1e-12);    // mean(1..10)
-        assertEquals(3.0, cal.lowLevel(), 1e-12);     // nearest-rank p25 of 1..10 = sorted[ceil(2.5)-1] = sorted[2]
+        assertEquals(5.5, cal.muDensity(), 1e-12);    // mean(1..10) -> the recovery gauge's calm band centre
         assertTrue(cal.sigmaDensity() > 0);
     }
 
