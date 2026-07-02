@@ -73,6 +73,25 @@ public interface ChangeDetector {
     void onSessionBoundary();
 
     /**
+     * Installs a fresh calm-window {@link Calibration} onto this running detector — an adaptive
+     * caller opening a new calibration epoch (Initiative-S H2). The CUSUM arms re-baseline to the
+     * new {@code (mu, sigma)} with {@code S+ = S- = 0} (a new baseline invalidates the old
+     * accumulation — carrying it forward would be a false-alarm head-start in units that no
+     * longer mean anything), and the level gate {@code L} and the de-fusion calm band
+     * {@code L_band = mu_D + bandC * sigma_D} re-derive from the new calibration. Everything else
+     * is <strong>preserved</strong>: the previous matrix (the next transition is still scored — a
+     * recalibration is <em>not</em> a session boundary, cf. {@link #onSessionBoundary()}), the
+     * was-fused latch (a physical regime fact independent of the calm baseline), the
+     * recovery-gauge occupancy buffer (its trailing history self-heals over the gauge window),
+     * the one-fire-per-window debounce flags, and the window-id state. Single-writer, like
+     * {@link #onMatrix(double[][])}.
+     *
+     * @param calibration the new calm-window calibration to run against
+     * @throws IllegalArgumentException if {@code calibration} is {@code null}
+     */
+    void recalibrate(Calibration calibration);
+
+    /**
      * The first transition at which this detector fired, if any.
      *
      * @return the first fired {@link ChangeSignal}, or {@link Optional#empty()} if the detector
