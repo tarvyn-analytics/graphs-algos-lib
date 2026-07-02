@@ -25,10 +25,12 @@ final class CusumChangeDetector implements ChangeDetector {
 
     private final int order;
     private final DetectorConfig config;
-    private final Calibration calibration;
-    private final CusumAccumulator cusum;
     private final RecoveryGauge gauge;
-    private final double lBand;
+
+    // Re-derived by recalibrate(..) when an adaptive caller opens a new calibration epoch.
+    private Calibration calibration;
+    private CusumAccumulator cusum;
+    private double lBand;
 
     private double[][] previous;
     private long seq;
@@ -142,6 +144,21 @@ final class CusumChangeDetector implements ChangeDetector {
             return config.fireArm() == FireArm.UPPER ? FireDirection.FUSION : FireDirection.DEFUSION;
         }
         return fireDefusion ? FireDirection.DEFUSION : FireDirection.NONE;
+    }
+
+    @Override
+    public void recalibrate(Calibration calibration) {
+        if (calibration == null) {
+            throw new IllegalArgumentException("calibration must not be null");
+        }
+        // Re-baseline: fresh accumulator on the new (mu, sigma) with S+/S- = 0 — the old
+        // accumulation is in sigma-of-the-old-baseline units and would be a spurious head-start
+        // against a baseline just redefined to make it look normal (numerics spec Q1). The
+        // previous matrix, wasFused latch, gauge buffer, debounce flags and window-id state are
+        // deliberately untouched: a recalibration is not a session boundary.
+        this.calibration = calibration;
+        this.cusum = new CusumAccumulator(calibration.mu(), calibration.sigma(), config.k());
+        this.lBand = calibration.muDensity() + config.defusion().bandC() * calibration.sigmaDensity();
     }
 
     @Override
