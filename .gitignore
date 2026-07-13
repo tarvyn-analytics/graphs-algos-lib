@@ -17,3 +17,10 @@ dependency-reduced-pom.xml
 
 # Local secrets (never commit)
 .sonar-token
+
+# Local analysis artifacts (S&P 500 reports) — stay on disk, referenced from corrcalc-graphs-meta
+/results/
+
+# Machine-local Claude Code state
+.claude/agent-memory/
+.claude/settings.local.json
