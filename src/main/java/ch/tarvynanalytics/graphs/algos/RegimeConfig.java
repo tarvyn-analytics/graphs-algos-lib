@@ -44,7 +44,7 @@ public record RegimeConfig(double hi, double lo, int confirmBars) {
 
     /**
      * The settled crypto regime marks ({@code h2r1_regime_model.py}, validated on the continuous
-     * continuous 17-symbol tape: 12 fused-regime cycles, calm FA 0.008/day, covid recovery −4 d and
+     * 17-symbol tape: 12 fused-regime cycles, calm FA 0.008/day, covid recovery −4 d and
      * ftx +4 d vs the walk-forward references): {@code hi=0.85, lo=0.45, confirmBars=3}. The caller
      * feeds a daily-aggregated, 3-day-median-smoothed density so {@code confirmBars=3} ≈ 3 days.
      *

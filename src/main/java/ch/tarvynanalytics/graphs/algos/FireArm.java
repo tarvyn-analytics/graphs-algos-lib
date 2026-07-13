@@ -4,7 +4,7 @@ package ch.tarvynanalytics.graphs.algos;
  * Which arm of the two-sided CUSUM opens an alert. v1 fires on the upper arm
  * (fusion / structure-tightening); the lower arm (de-fusion / structure-loosening,
  * the re-entry signal) is always computed and emitted, and becomes the firing arm
- * by a configuration flip rather than a code change by configuration.
+ * by a configuration flip rather than a code change.
  */
 public enum FireArm {
 
