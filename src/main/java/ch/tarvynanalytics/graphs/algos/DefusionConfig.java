@@ -7,8 +7,8 @@ import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
  * <strong>recovery gauge</strong> — the trailing fraction of a window the density series has spent back
  * in the calm band ({@code density ≤ L_band}, with {@code L_band = μ_D + bandC·σ_D}) — and a binary fire
  * when that gauge crosses {@link #theta()}, gated by a was-recently-fused latch and a full-window
- * confirmation (see {@link RecoveryGauge}, {@link CusumChangeDetector}, and
- * {@code initiative-s-defusion-gauge-spec.md}). This supersedes the earlier density-lower-arm CUSUM,
+ * confirmation (see {@link RecoveryGauge} and {@link CusumChangeDetector}).
+ * This supersedes the earlier density-lower-arm CUSUM,
  * which was falsified on real recovery data (it detected departure <em>below</em> the calm baseline, not
  * the fused→calm return); the gauge is the validated primitive.
  *
@@ -46,7 +46,7 @@ public record DefusionConfig(double bandC, double theta, int gaugeWindowSamples,
     /**
      * The default disabled de-fusion tuning ({@code bandC=0.75, theta=0.80, gaugeWindowSamples=96,
      * enabled=false}). The constants are the settled crypto gauge (a 48 h window at a 30-min cadence;
-     * θ=0.80 fires genuine recoveries and suppresses transient re-fusing dips, see the gauge spec §2.2);
+     * θ=0.80 fires genuine recoveries and suppresses transient re-fusing dips);
      * the gauge is still computed while disabled, only the binary fire is off.
      *
      * @return a firing-disabled de-fusion configuration

@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * H2R-2 oracle for the level+hysteresis {@link RegimeStateDetector} (design
- * {@code initiative-s-h2-lifecycle-revision-design.md} §4). Correctness is proven against an
+ * Oracle for the level+hysteresis {@link RegimeStateDetector}.
+ * Correctness is proven against an
  * <strong>independent naive batch reference</strong> ({@link #naiveTransitions}) — a straight loop
  * with an explicit regime flag and a single pending-run counter, a different mental model from the
  * streaming two-run state machine — and against <strong>hand-computed onset/offset indices</strong>,

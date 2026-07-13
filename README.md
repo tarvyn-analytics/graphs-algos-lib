@@ -1,5 +1,7 @@
 # graphs-algos-lib
 
+> Research program frozen 2026-07; this library is complete and maintained as-is. Entry point: [corrcalc-graphs-meta](https://github.com/tarvyn-analytics/corrcalc-graphs-meta).
+
 Pure-Java **graph-algorithms** library for the structural analysis of a graph
 built from a square **correlation** or **adjacency** matrix. It began as a
 transitive-orientation (comparability) analysis ported from the master's thesis
@@ -27,6 +29,17 @@ There is no GUI and there are **zero runtime dependencies**; every result is a
 plain immutable object you can inspect or serialize.
 
 ## Quick start
+
+As a dependency (published to GitHub Packages, private — resolve via a PAT with
+`read:packages`, or `./mvnw -DskipTests install` from this checkout):
+
+```xml
+<dependency>
+    <groupId>ch.tarvynanalytics.graphs</groupId>
+    <artifactId>graphs-algos-lib</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
 
 ```java
 import ch.tarvynanalytics.graphs.algos.ComparabilityAnalyzer;

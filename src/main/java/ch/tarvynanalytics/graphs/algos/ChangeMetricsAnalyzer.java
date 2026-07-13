@@ -7,7 +7,7 @@ import ch.tarvynanalytics.graphs.algos.model.PairChange;
 import java.util.List;
 
 /**
- * Computes the Initiative-S S3 structural-change metric between two
+ * Computes the S3 structural-change metric between two
  * consecutive correlation matrices over the same ordered variable set — the
  * pure-function metric core (D1). A later deliverable layers the two-sided
  * CUSUM change-point detector on top of this metric; this analyzer has no

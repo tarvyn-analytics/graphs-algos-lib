@@ -2,7 +2,7 @@ package ch.tarvynanalytics.graphs.algos.model;
 
 /**
  * The regime edge, if any, that a {@link RegimeSignal} step crossed — the hysteresis
- * (Schmitt-trigger) transition on the density level (Initiative-S H2R-2 backbone).
+ * (Schmitt-trigger) transition on the density level.
  *
  * <p>{@link #FUSION_ONSET} is the up-crossing ({@link RegimeState#CALM} → {@link RegimeState#FUSED}):
  * density held at/above the high mark for the confirmation run — a regime opened.

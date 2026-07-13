@@ -16,7 +16,7 @@ import ch.tarvynanalytics.graphs.algos.model.RegimeTransition;
  * finite sample above it; reaching {@code confirmBars} closes it ({@link RegimeTransition#CALM_ONSET}).
  * A non-finite (gap) sample is skipped whole — no run advances or resets, no state change. A cold
  * stream starts {@code CALM} (diversified until proven fused). This is a faithful streaming port of
- * the H2R-1 spike {@code h2r1_regime_model.py}. Single-writer, O(1) state and time.</p>
+ * the spike oracle {@code h2r1_regime_model.py}. Single-writer, O(1) state and time.</p>
  */
 final class RegimeStateDetector implements RegimeDetector {
 

@@ -5,7 +5,7 @@ import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 /**
  * The per-asset / per-regime tuning of the {@link ChangeDetector}. Every threshold
  * is configuration, never a literal baked into the detector body, so a new market is
- * wired rather than coded (Initiative-S S3, build-design §3.3/§6). Two named factories
+ * wired rather than coded. Two named factories
  * carry the settled defaults: {@link #crypto()} (the recalibrated crypto constants) and
  * {@link #equity()} (the original {@code replay_alert} constants).
  *

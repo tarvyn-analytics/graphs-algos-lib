@@ -3,12 +3,11 @@ package ch.tarvynanalytics.graphs.algos;
 import ch.tarvynanalytics.graphs.algos.model.RegimeSignal;
 
 /**
- * Streaming Initiative-S H2R-2 <strong>regime-state</strong> detector: it consumes a stream of
+ * Streaming <strong>regime-state</strong> detector: it consumes a stream of
  * scalar level samples (in practice the smoothed correlation density over one timescale) and emits,
  * per sample, a {@link RegimeSignal} carrying the current regime and any regime edge crossed. This
- * is the continuous-tape backbone the H2R-1 finding recommended — a level+hysteresis (Schmitt)
- * read that self-segments calm from fused where the change-CUSUM ({@link ChangeDetector}) could not
- * (see {@code initiative-s-h2-lifecycle-revision-design.md}).
+ * is the continuous-tape backbone — a level+hysteresis (Schmitt)
+ * read that self-segments calm from fused where the change-CUSUM ({@link ChangeDetector}) could not.
  *
  * <p>A {@code RegimeDetector} is <strong>single-writer</strong>: it is not safe for concurrent
  * {@link #step} calls, exactly like the {@link ChangeDetector}. Obtain one via
