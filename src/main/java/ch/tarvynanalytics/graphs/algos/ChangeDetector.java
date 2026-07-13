@@ -5,7 +5,7 @@ import ch.tarvynanalytics.graphs.algos.model.ChangeSignal;
 import java.util.Optional;
 
 /**
- * Streaming Initiative-S S3 change-point detector: it consumes a stream of consecutive
+ * Streaming S3 change-point detector: it consumes a stream of consecutive
  * correlation matrices over one timescale and emits, per transition, a {@link ChangeSignal}
  * carrying the change metrics and the two-sided CUSUM state. This is the library's one
  * stateful object on the S3 side (mirroring S1's streaming engine in corrcalc-lib); the
@@ -39,7 +39,7 @@ public interface ChangeDetector {
 
     /**
      * Ingests the next correlation matrix tagged with a caller-supplied <strong>window id</strong>,
-     * for one-fire-per-window false-alarm measurement over a long multi-session calm span (spec
+     * for one-fire-per-window false-alarm measurement over a long multi-session calm span (the S3 change-metric spec's
      * §2.4 {@code reset_ids}). Behaves exactly like {@link #onMatrix(double[][])} except that when
      * {@code windowId} differs from the previous windowed call's id, the detector first
      * <strong>re-arms</strong>: the one-fire-per-window debounce is cleared and the firing CUSUM arm
@@ -74,7 +74,7 @@ public interface ChangeDetector {
 
     /**
      * Installs a fresh calm-window {@link Calibration} onto this running detector — an adaptive
-     * caller opening a new calibration epoch (Initiative-S H2). The CUSUM arms re-baseline to the
+     * caller opening a new calibration epoch. The CUSUM arms re-baseline to the
      * new {@code (mu, sigma)} with {@code S+ = S- = 0} (a new baseline invalidates the old
      * accumulation — carrying it forward would be a false-alarm head-start in units that no
      * longer mean anything), and the level gate {@code L} and the de-fusion calm band

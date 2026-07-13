@@ -72,7 +72,7 @@ final class ModularDecomposition {
      * near-linear {@code fracture} builder ({@link #buildTreeLinear()}); below it the
      * low-constant simple recursion ({@link #buildTree}) is faster. The two builders are
      * proven equivalent (ModularDecompositionLinearDifferentialTest), so this is a pure
-     * performance switch. Chosen empirically with the {@code Benchmark} harness (GAL-16).
+     * performance switch. Chosen empirically with the {@code Benchmark} harness.
      */
     static final int LINEAR_THRESHOLD = 50;
 

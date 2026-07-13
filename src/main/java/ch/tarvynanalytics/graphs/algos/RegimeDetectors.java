@@ -1,7 +1,7 @@
 package ch.tarvynanalytics.graphs.algos;
 
 /**
- * Factory for the Initiative-S H2R-2 {@link RegimeDetector} — the public entry point for the
+ * Factory for the {@link RegimeDetector} — the public entry point for the
  * level+hysteresis regime-state detector (mirrors the {@link ChangeDetectors} factory recipe of the
  * rest of the library). The detector implementation stays package-private (family invariant:
  * implementations are package-private; public surface is the entry points).

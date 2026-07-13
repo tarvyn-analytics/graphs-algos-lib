@@ -3,7 +3,7 @@ package ch.tarvynanalytics.graphs.algos;
 import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 
 /**
- * The tuning of the level+hysteresis {@code RegimeStateDetector} (Initiative-S H2R-2 backbone):
+ * The tuning of the level+hysteresis {@code RegimeStateDetector}:
  * the two Schmitt-trigger marks and the persistence run. Every value is configuration — a new
  * market or universe is <em>wired</em> (its own thresholds), not coded (family invariant "thresholds
  * are config, not code"); the detector itself is asset- and cadence-agnostic and never names a
@@ -43,9 +43,9 @@ public record RegimeConfig(double hi, double lo, int confirmBars) {
     }
 
     /**
-     * The settled crypto regime marks (H2R-1 {@code h2r1_regime_model.py}, validated on the DATA-1
+     * The settled crypto regime marks ({@code h2r1_regime_model.py}, validated on the continuous
      * continuous 17-symbol tape: 12 fused-regime cycles, calm FA 0.008/day, covid recovery −4 d and
-     * ftx +4 d vs the gauge-spec §7 references): {@code hi=0.85, lo=0.45, confirmBars=3}. The caller
+     * ftx +4 d vs the walk-forward references): {@code hi=0.85, lo=0.45, confirmBars=3}. The caller
      * feeds a daily-aggregated, 3-day-median-smoothed density so {@code confirmBars=3} ≈ 3 days.
      *
      * @return a crypto-tuned regime configuration

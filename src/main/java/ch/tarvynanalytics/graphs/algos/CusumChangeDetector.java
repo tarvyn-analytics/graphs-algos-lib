@@ -18,8 +18,7 @@ import java.util.Optional;
  * in-band occupancy of the density series — which fires when the gauge crosses {@code θ} with a full
  * window, gated by a was-recently-fused latch. The gauge is <em>always computed and emitted</em>
  * (informational); the binary fire is <em>disabled by default</em> ({@code config.defusion().enabled()
- * == false}) and entirely inert in that case, so the pinned upper-arm behaviour cannot move. See
- * {@code initiative-s-defusion-gauge-spec.md}.</p>
+ * == false}) and entirely inert in that case, so the pinned upper-arm behaviour cannot move.</p>
  */
 final class CusumChangeDetector implements ChangeDetector {
 
@@ -62,7 +61,7 @@ final class CusumChangeDetector implements ChangeDetector {
     @Override
     public ChangeSignal onMatrix(double[][] correlation, long windowId) {
         if (hasWindowId && windowId != currentWindowId) {
-            // spec §2.4 reset_ids: a new window re-arms the debounce and the firing arm only —
+            // The S3 change-metric spec's reset_ids rule: a new window re-arms the debounce and the firing arm only —
             // the previous matrix and the opposite arm are left intact (cf. onSessionBoundary()).
             alreadyFiredPrimary = false;
             cusum.resetArm(config.fireArm());
@@ -153,7 +152,7 @@ final class CusumChangeDetector implements ChangeDetector {
         }
         // Re-baseline: fresh accumulator on the new (mu, sigma) with S+/S- = 0 — the old
         // accumulation is in sigma-of-the-old-baseline units and would be a spurious head-start
-        // against a baseline just redefined to make it look normal (numerics spec Q1). The
+        // against a baseline just redefined to make it look normal. The
         // previous matrix, wasFused latch, gauge buffer, debounce flags and window-id state are
         // deliberately untouched: a recalibration is not a session boundary.
         this.calibration = calibration;

@@ -12,14 +12,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * GAL-A oracle for {@link ChangeDetector#recalibrate} (Initiative-S H2, numerics spec Q1):
+ * Oracle for {@link ChangeDetector#recalibrate}:
  * recalibrate-then-score must be <strong>bit-identical</strong> to build-fresh-then-score on the
  * post-epoch slice (the recalibrate path and the constructor path are different code, so this is a
  * genuine cross-check), the CUSUM arms must RESET (never inherit the old-baseline accumulation),
  * and the previous matrix / was-fused latch / recovery-gauge buffer must be preserved (a
  * recalibration is not a session boundary). A 2x2 matrix has a single pair, so
  * {@code weighted_change = |Δr|} and density is the single edge indicator — exact control over the
- * series fed into the detector. Hand literals from the numerics spec: old calm (μ₀,σ₀)=(2,1), new
+ * series fed into the detector. Hand literals: old calm (μ₀,σ₀)=(2,1), new
  * epoch (μ₁,σ₁)=(4,1), k=1.5 ({@link DetectorConfig#crypto()}).
  */
 class CusumChangeDetectorRecalibrateTest {

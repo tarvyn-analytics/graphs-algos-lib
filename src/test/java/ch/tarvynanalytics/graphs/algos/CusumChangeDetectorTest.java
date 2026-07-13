@@ -81,7 +81,7 @@ class CusumChangeDetectorTest {
     @Test
     void onMatrix_LegacyLowerArmConfig_FiresOnChangeMetricLowerArm_MechanicsOnly() {
         // MECHANICS PIN, not a usable de-fusion config: fireArm=LOWER fires on the change-metric lower
-        // arm (sMinus), which is structurally dead on real data (defusion spec §1). The real all-clear
+        // arm (sMinus), which is structurally dead on real data. The real all-clear
         // is the density-arm path (defusionEnabled), tested below. Kept to guard the max(0,S- - z - k)
         // recursion + the fireArm=LOWER primary path. With z chosen far-negative (mu=1, change=0) the
         // arm can be made to fire here; the direction of a lower-arm primary fire is DEFUSION.
@@ -96,7 +96,7 @@ class CusumChangeDetectorTest {
     }
 
     // ---- de-fusion ("all-clear") path: the recovery gauge + was-fused latch + full-window confirmation ----
-    // (Oracle A2-A6 of initiative-s-defusion-gauge-spec.md §6). 2x2 matrix => density in {0,1} exact.
+    // (hand-computed oracles A2-A6). 2x2 matrix => density in {0,1} exact.
     // muDensity=0.2, sigmaDensity=0.4, bandC=0.75 => L_band=0.5: density 0 in-band, density 1 out-of-band.
     // Gauge window N_g=4 and theta=0.75 give hand-computable fractions.
 

@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Oracle A1 of {@code initiative-s-defusion-gauge-spec.md} §6 for the {@link RecoveryGauge}: ground
+ * Oracle A1 for the {@link RecoveryGauge}: ground
  * truth is the hand-computed trailing-occupancy trace, never the implementation's output. A small window
  * {@code N_g=4} makes every fraction hand-verifiable.
  */

@@ -30,6 +30,17 @@ plain immutable object you can inspect or serialize.
 
 ## Quick start
 
+As a dependency (published to GitHub Packages, private — resolve via a PAT with
+`read:packages`, or `./mvnw -DskipTests install` from this checkout):
+
+```xml
+<dependency>
+    <groupId>ch.tarvynanalytics.graphs</groupId>
+    <artifactId>graphs-algos-lib</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
 ```java
 import ch.tarvynanalytics.graphs.algos.ComparabilityAnalyzer;
 import ch.tarvynanalytics.graphs.algos.GraphInput;

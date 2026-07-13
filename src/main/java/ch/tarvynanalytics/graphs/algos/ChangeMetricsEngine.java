@@ -10,7 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Computes the Initiative-S S3 structural-change metric and its secondary
+ * Computes the S3 structural-change metric and its secondary
  * features for one transition {@code C_{t-1} -> C_t}, in a single
  * {@code O(m^2)} pass over the upper triangle. Package-private engine behind
  * {@link ChangeMetricsAnalyzer}; see that class for the public contract.

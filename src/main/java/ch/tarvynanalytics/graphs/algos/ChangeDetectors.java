@@ -5,7 +5,7 @@ import ch.tarvynanalytics.graphs.algos.exception.InvalidInputException;
 import java.util.Arrays;
 
 /**
- * Factory and calibration helper for the Initiative-S S3 {@link ChangeDetector} — the public
+ * Factory and calibration helper for the S3 {@link ChangeDetector} — the public
  * entry point for the streaming change-point detector (mirrors the analyzer/factory recipe of
  * the rest of the library).
  */

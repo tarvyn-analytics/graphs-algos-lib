@@ -2,16 +2,15 @@ package ch.tarvynanalytics.graphs.algos.model;
 
 /**
  * The structural-change signal emitted per consecutive matrix transition
- * {@code C_{t-1} -> C_t} by the Initiative-S S3 detector: the {@link ChangeMetrics}
+ * {@code C_{t-1} -> C_t} by the S3 detector: the {@link ChangeMetrics}
  * for the transition plus the CUSUM state and the fire decision.
  *
  * <p><strong>Two CUSUM arms plus the recovery gauge are emitted.</strong> {@link #sPlus()} is the fusion
  * (structure-tightening) arm that fires the exit alert. {@link #sMinus()} is the lower arm on the
  * change metric — kept for continuity, but <em>informational only</em>: it is structurally unable to
- * trigger on real data (see {@code initiative-s-defusion-rule-spec.md} §1), so it is not the re-entry
+ * trigger on real data, so it is not the re-entry
  * signal. {@link #recoveryGauge()} is the de-fusion "all-clear" primitive — the trailing in-band
- * occupancy that runs {@code 0 → 1} as structure heals after a fusion (always populated; see
- * {@code initiative-s-defusion-gauge-spec.md}).</p>
+ * occupancy that runs {@code 0 → 1} as structure heals after a fusion (always populated).</p>
  *
  * <p>{@link #fireDirection()} says which transition, if any, opened an alert: {@link FireDirection#FUSION}
  * (upper arm), {@link FireDirection#DEFUSION} (de-fusion / re-entry — the gauge crossing its threshold),

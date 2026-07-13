@@ -6,7 +6,7 @@ package ch.tarvynanalytics.graphs.algos;
  * <pre>
  *   S+_t = max(0, S+_{t-1} + z_t - k)     (fusion / upper arm — the primary exit alert)
  *   S-_t = max(0, S-_{t-1} - z_t - k)     (lower arm on the change metric — informational only;
- *                                          structurally dead on real data, see defusion spec §1)
+ *                                          structurally dead on real data)
  * </pre>
  * Package-private state holder behind {@link CusumChangeDetector}. The de-fusion ("all-clear") signal is
  * <em>not</em> a CUSUM arm here — it is the {@link RecoveryGauge} (a density-band occupancy), the

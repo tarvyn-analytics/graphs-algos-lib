@@ -6,7 +6,7 @@ package ch.tarvynanalytics.graphs.algos;
  * the calm band?" — the trailing fraction of the last {@code N_g} samples whose density sat in the calm
  * band ({@code density ≤ L_band}). After a fusion alarm it runs <strong>0 → 1</strong> as the structure
  * heals (the dashboard's gradual-recovery track); a binary all-clear is a threshold crossing on it (see
- * {@link CusumChangeDetector}). See {@code initiative-s-defusion-gauge-spec.md} §1.
+ * {@link CusumChangeDetector}).
  *
  * <p>Anchoring is by {@link #reset()} (called by the detector at the most recent fusion fire and at a
  * session boundary): the window never reaches back before the anchor, so the gauge starts from the

@@ -2,12 +2,12 @@ package ch.tarvynanalytics.graphs.algos.model;
 
 /**
  * The regime-state signal emitted per level sample by the level+hysteresis
- * {@code RegimeStateDetector} (Initiative-S H2R-2 backbone): the level fed in, the regime
+ * {@code RegimeStateDetector}: the level fed in, the regime
  * <em>after</em> this step, and which regime edge — if any — this step crossed.
  *
- * <p>This is the continuous-tape backbone the H2R-1 finding recommended: the density level read
+ * <p>This is the continuous-tape backbone: the density level read
  * with two thresholds and persistence self-segments calm from fused where the change-CUSUM could
- * not (see {@code initiative-s-h2-lifecycle-revision-design.md}). One {@link RegimeTransition}
+ * not. One {@link RegimeTransition}
  * other than {@link RegimeTransition#NONE} marks exactly one regime cycle edge — a
  * {@link RegimeTransition#FUSION_ONSET} opens a regime, the paired {@link RegimeTransition#CALM_ONSET}
  * closes it (the all-clear).</p>

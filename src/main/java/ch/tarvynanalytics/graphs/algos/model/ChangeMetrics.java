@@ -4,9 +4,7 @@ import java.util.List;
 
 /**
  * The structural-change signal between two consecutive correlation matrices
- * {@code C_{t-1} -> C_t} over the same ordered variable set (Initiative-S S3,
- * the pure-metric core — D1; the two-sided CUSUM detector that consumes this
- * record is a later deliverable).
+ * {@code C_{t-1} -> C_t} over the same ordered variable set (the S3 change-metric spec's pure-metric core).
  *
  * <p><strong>{@link #weightedChange()}</strong> is the primary metric: the mean
  * absolute correlation change over the pairs valid (finite) in <em>both</em>
