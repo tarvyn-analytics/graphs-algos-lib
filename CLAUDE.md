@@ -1,114 +1,64 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repository.
-
-Read `README.md` first — it owns the project overview, the public API examples,
-the package layout and the scope of the comparability test. This file tells you
-how to work on the code: the rules that must hold and the common task recipes.
+Guidance for Claude Code when working in this repository. Read `README.md` first — it owns
+the overview, the public API examples and the scope of each analysis.
 
 ## Commands
 
 ```bash
-./mvnw clean verify           # full build: tests + coverage gates — run before claiming done
-./mvnw test                   # tests only (faster iteration)
-./mvnw test -Dtest=ClassName  # single test class
+./mvnw clean verify                       # full build: tests + coverage gates — run before claiming done
+./mvnw test -Dtest=ClassName              # single test class
+./mvnw -Ppublish -DskipTests javadoc:jar  # CI's javadoc gate — plain verify never runs it
 ```
 
-Single module; the artifact `ch.tarvynanalytics.graphs:graphs-comparability-lib`
-is published to GitHub Packages. Building requires **JDK 21+**; the bytecode
-target is `--release 21`. Coverage report:
-`target/site/jacoco/index.html` (CSV next to it for scripting). This is a
-library — there is no application to run; the tests are the executable spec.
+Single module, published as `ch.tarvynanalytics.graphs:graphs-algos-lib`. **JDK 21+**, target
+`--release 21`. This is a library — the tests are the executable spec. Run the CLI:
+`./mvnw -q package -DskipTests` then `java -jar target/graphs-algos-lib-*.jar matrix.csv
+--threshold 0.5`; exit codes are result-only (`0` ran / `2` usage / `1` input-IO).
 
 ## Invariants — never break these
 
-1. **Zero runtime dependencies.** Test scope (JUnit) is the only exception. Do
-   not add a JSON library, Guava, commons-*, anything — hand-roll it.
-2. **Faithful to the thesis algorithm.** The engine (`GraphParser`, `Graph`,
-   `Node`, `FactorGraphLevel`) is a deliberate port of the C# prototype
-   (`## Anexa` of the thesis). Keep the decomposition order
-   (not-linked → full → minimal), the chordless-chain machinery and the
-   odd-cycle test behaviourally identical. When in doubt, match the original;
-   do not "improve" the graph theory. Engine nodes are compared by **reference
-   identity** (no `equals` override) — list membership relies on it.
-3. **The public result is immutable.** Everything in `model/` is a `record` with
-   defensive `List.copyOf` in its compact constructor. The engine is mutable and
-   package-private; never leak engine `Node`/`Graph` objects across the API.
-4. **Implementations are package-private.** Only `ComparabilityAnalyzer`,
-   `GraphInput`, the `model` records and the exceptions are public. Keep it that
-   way.
-5. **Validation errors throw `InvalidInputException`** with the offending values
-   in brackets, e.g. `"... got [3x0]"`. Null `GraphInput` to the analyzer throws
-   `IllegalArgumentException`.
-6. **Orientation count is a `BigInteger`.** It grows factorially; never narrow it
-   to `int`/`long`.
-7. **Coverage gates 80% line / 70% branch** are enforced by `verify`. New code
-   arrives with tests in the same commit.
+1. **Dependencies: lean, not zero.** Prefer hand-rolling small things (a JSON line, an
+   escaper) over pulling in Guava/commons-*; justify each new dependency by what it saves.
+2. **Correct, standard algorithms — not the thesis port.** The original C# chain-folding
+   engine was unsound/incomplete (see `docs/theory-review.md`, GAL-5) and was replaced:
+   comparability verdict + obstruction via **Golumbic's forcing relation (Γ)**
+   (`ForcingRelation`); orientation count + factor-graph levels via **canonical modular
+   decomposition** (`ModularDecomposition`: ∏ `k!`/series, `1`/parallel, `2`/prime).
+   `Chordality` is a separate engine (MCS perfect-elimination; hole witness; greedy
+   completion). Every engine is pinned by an exhaustive brute-force oracle over all small
+   graphs (`OracleCharacterizationTest` n≤5 verdict+count, `ChordalityTest` n≤6,
+   `StructuralBalanceTest` all signed graphs n≤5). Prove any engine change against the
+   oracle; never regress to the thesis heuristic.
+3. **The public result is immutable.** Everything in `model/` is a record with defensive
+   `List.copyOf`; never leak internal working state.
+4. **Implementations are package-private.** Public surface = the entry points
+   (`ComparabilityAnalyzer`, `BatchAnalyzer`, `DecomposabilityDiagnostic`,
+   `StructuralBalanceAnalyzer`, `CrossEstimatorAnalyzer`, `ChangeMetricsAnalyzer`,
+   `cli.ComparabilityCli`), inputs (`GraphInput`, `EstimatorMatrix`), `model` records,
+   `export` serializers, exceptions.
+5. **Validation errors throw `InvalidInputException`** with offending values in `[brackets]`;
+   null `GraphInput` throws `IllegalArgumentException`.
+6. **Orientation count is a `BigInteger`** — it grows factorially; never narrow it.
+7. **Coverage gates 80% line / 70% branch** enforced by `verify`; tests in the same commit.
+
+New analyzers/exporters/result fields mirror the existing precedents (public entry point +
+package-private engine + oracle or hand-computed-fixture test + immutable record). The
+console/`System.exit` Sonar rules are silenced only for `**/cli/*.java`.
 
 ## Testing conventions
 
-- Naming: `method_Scenario_Expectation`
-  (`oddCycle_IsNotComparability_AndReportsTheCycle`).
-- Test packages mirror main 1:1; a test class covers the class it is named after.
-- Prove verdicts against **known graph theory**, not against the code's own
-  output: cliques have `n!` orientations, paths and even cycles are comparability,
-  odd cycles (C5, C7, …) are not and yield a failure cycle of that length,
-  disjoint cliques (cographs) decompose over multiple levels. Build the fixtures
-  (`complete`, `cycle`, `path`) inside the test.
-- Assertion arguments are `(expected, actual)` — expected value first.
+Naming `method_Scenario_Expectation`; test packages mirror main 1:1; assertions
+`(expected, actual)`. Verdicts are proven against **known graph theory** (cliques have `n!`
+orientations, odd cycles are non-comparability, cographs decompose) and brute-force oracles —
+never against the code's own output.
 
-## Task guides
+## Delivery
 
-### Touch the decomposition engine (`GraphParser` & friends)
-
-The known-graph tests in `ComparabilityAnalyzerTest` are the safety net — they
-must keep passing. The trickiest part is the minimal-module chain extension
-(`getNonTriangChain` → `continueNonTriangChain` → `createNonTriangApendix` /
-`increaseApendix` / `reverseAppendNonTriangs`): it grows a chordless chain to
-cover every edge of a minimal module, and the result feeds `canCreateOddCycle`.
-The orientation bookkeeping (`nodesTo`/`nodesFrom`/`nodesNotOriented`) is scratch
-state that drives which edges still need covering; it is reset before the
-odd-cycle test and no concrete direction is ever exposed. If you change it,
-re-verify against the odd-cycle fixtures and add the new case to the suite.
-
-### Add a result field
-
-Add the component to the relevant `model/` record (with a defensive copy if it is
-a collection), populate it in `ResultBuilder`, and exercise it in `ModelTest`
-plus the analyzer suite. Keep the record's javadoc accurate — the published jar
-ships javadoc and the `-Ppublish` build fails on javadoc errors.
-
-### Add an exporter (e.g. JSON, DOT)
-
-Put it in `export/` as a public final class with static methods over the `model`
-records. Hand-roll the format (invariant 1 — no dependencies). Escape strings
-yourself. Test the exact output on a small known result.
-
-## Delivery: Jira, Git, PRs, CI
-
-- **Jira** (project `CGD`, *Comparability Graph Detection*): use
-  `.claude/tools/jira/jira.sh` — full usage in `.claude/skills/jira/SKILL.md`.
-  Every piece of work hangs off an issue; epic for the initiative, task per
-  deliverable. Transition to `In Progress` when starting, `Done` with a PR/commit
-  reference when finished. (Sub-task issue type is named `Subtask`.)
-- **GitFlow**: `main` (released) ← `develop` (integration) ← `feature/*`. Branch
-  naming: `feature/CGD-<n>-eb-<short-description>`. PRs target `develop` and are
-  **squash**-merged; only release merges go `develop` → `main` and use a **true
-  merge commit** (`gh pr merge --merge`), never squash. After a release,
-  back-merge main into develop and bump the pom to the next `-SNAPSHOT`. Full
-  procedure: `.claude/skills/release/SKILL.md`.
-- **Commit style**: conventional commits with scope and issue key, e.g.
-  `feat(lib): [CGD-3]: port the comparability engine`; body explains the why.
-  GPG signing fails under WSL ("Unusable secret key") — use
-  `git commit --no-gpg-sign` from WSL.
-- **GitHub** (`tarvyn-analytics/graphs-comparability-lib`, private): use the `gh`
-  CLI directly — `gh pr create --base develop`, `gh pr checks --watch`,
-  `gh pr merge --squash`, `gh run watch`.
-- **CI** (`.github/workflows/`): `validate-on-pull-request.yml` runs
-  `./mvnw -Ppublish clean verify sonar:sonar` on PRs to develop/main, uploads the
-  JaCoCo report and enforces the SonarCloud quality gate; `build-on-push.yml`
-  publishes the jar (with sources and javadoc) to GitHub Packages on pushes —
-  develop publishes the SNAPSHOT, main strips the suffix, publishes the release
-  and pushes the `vX.Y.Z` tag. The same release version cannot be published
-  twice, so bump the version on develop before each release merge to main.
-  SonarCloud org/host/projectKey come from the pom. No DB, no Docker — keep it so.
+Jira **GAL** (`.claude/tools/jira/jira.sh`; sub-task type is `Subtask`). GitFlow: PR-only
+**squash** into `develop`, branch `feature/GAL-<n>-eb-<desc>`; releases `develop`→`main` as a
+true merge commit, then back-merge and bump `-SNAPSHOT` (procedure:
+`.claude/skills/release/SKILL.md`). Conventional commits with issue key; `--no-gpg-sign`
+under WSL. CI: `-Ppublish clean verify sonar:sonar` on PRs (javadoc errors fail there — the
+published jar ships javadoc); GitHub Packages on push (develop=SNAPSHOT, main=release+tag,
+bump before release merges). No DB, no Docker.

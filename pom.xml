@@ -3,15 +3,23 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ch.tarvynanalytics.graphs</groupId>
-    <artifactId>graphs-comparability-lib</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <artifactId>graphs-algos-lib</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>graphs comparability lib</name>
-    <description>Pure Java library that decides whether a graph (built from a thresholded
-        correlation/adjacency matrix) is a comparability graph (transitively orientable),
-        produces the factor-graph (modular) decomposition hierarchy and the count of distinct
-        transitive orientations, or reports the obstructing odd chordless cycle. Analysis only,
-        no GUI; zero runtime dependencies.</description>
+    <name>graphs algos lib</name>
+    <description>Pure Java graph-algorithms library over a thresholded correlation/adjacency
+        matrix: comparability (transitive orientation) detection with modular decomposition and
+        orientation count, chordality detection/completion, decomposability repair, signed-graph
+        structural balance and cross-estimator robustness. Analysis only, no GUI; zero
+        runtime dependencies.</description>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -20,25 +28,37 @@
         <!-- SonarCloud analysis (same organization as the other tarvyn-analytics repos) -->
         <sonar.organization>tarvyn-analytics</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <sonar.projectKey>tarvyn-analytics_graphs-comparability-lib</sonar.projectKey>
-        <!-- S5778 expects a single throwing call in a lambda; it does not fit JUnit
-             assertThrows where a setup call legitimately precedes the throwing one.
-             Exclude it from test sources only. -->
-        <sonar.issue.ignore.multicriteria>e1</sonar.issue.ignore.multicriteria>
+        <sonar.projectKey>tarvyn-analytics_graphs-algos-lib</sonar.projectKey>
+        <!-- e1: S5778 expects a single throwing call in a lambda; it does not fit
+             JUnit assertThrows where a setup call legitimately precedes the throwing
+             one. Exclude it from test sources only.
+             e2/e3: the CLI legitimately writes to the console (S106) and ends the
+             process with System.exit (S1147) — both are intrinsic to a command-line
+             entry point, so they are silenced for the cli package only.
+             e4: S6218 wants array-holding records to override equals/hashCode/toString;
+             CorrelationCsv.Parsed is a package-private, read-once carrier that is never
+             compared, hashed or printed, so the generated members are irrelevant. -->
+        <sonar.issue.ignore.multicriteria>e1,e2,e3,e4</sonar.issue.ignore.multicriteria>
         <sonar.issue.ignore.multicriteria.e1.ruleKey>java:S5778</sonar.issue.ignore.multicriteria.e1.ruleKey>
         <sonar.issue.ignore.multicriteria.e1.resourceKey>**/*Test.java</sonar.issue.ignore.multicriteria.e1.resourceKey>
+        <sonar.issue.ignore.multicriteria.e2.ruleKey>java:S106</sonar.issue.ignore.multicriteria.e2.ruleKey>
+        <sonar.issue.ignore.multicriteria.e2.resourceKey>**/cli/*.java</sonar.issue.ignore.multicriteria.e2.resourceKey>
+        <sonar.issue.ignore.multicriteria.e3.ruleKey>java:S1147</sonar.issue.ignore.multicriteria.e3.ruleKey>
+        <sonar.issue.ignore.multicriteria.e3.resourceKey>**/cli/*.java</sonar.issue.ignore.multicriteria.e3.resourceKey>
+        <sonar.issue.ignore.multicriteria.e4.ruleKey>java:S6218</sonar.issue.ignore.multicriteria.e4.ruleKey>
+        <sonar.issue.ignore.multicriteria.e4.resourceKey>**/cli/*.java</sonar.issue.ignore.multicriteria.e4.resourceKey>
     </properties>
 
     <distributionManagement>
         <repository>
             <id>github</id>
-            <name>GitHub Packages (tarvyn-analytics/graphs-comparability-lib)</name>
-            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-comparability-lib</url>
+            <name>GitHub Packages (tarvyn-analytics/graphs-algos-lib)</name>
+            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-algos-lib</url>
         </repository>
         <snapshotRepository>
             <id>github</id>
-            <name>GitHub Packages (tarvyn-analytics/graphs-comparability-lib)</name>
-            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-comparability-lib</url>
+            <name>GitHub Packages (tarvyn-analytics/graphs-algos-lib)</name>
+            <url>https://maven.pkg.github.com/tarvyn-analytics/graphs-algos-lib</url>
         </snapshotRepository>
     </distributionManagement>
 
@@ -79,6 +99,21 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.14.0</version>
+            </plugin>
+            <!-- Make the jar runnable (a small CLI over a correlation-matrix CSV).
+                 The Main-Class manifest entry is inert when the jar is used as a
+                 library dependency; no new runtime dependency is introduced. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>ch.tarvynanalytics.graphs.algos.cli.ComparabilityCli</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
