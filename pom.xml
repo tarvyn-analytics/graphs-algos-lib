@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>ch.tarvynanalytics.graphs</groupId>
     <artifactId>graphs-algos-lib</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>graphs algos lib</name>
     <description>Pure Java graph-algorithms library over a thresholded correlation/adjacency
@@ -12,6 +12,14 @@
         orientation count, chordality detection/completion, decomposability repair, signed-graph
         structural balance and cross-estimator robustness. Analysis only, no GUI; zero
         runtime dependencies.</description>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>

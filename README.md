@@ -1,43 +1,44 @@
 # graphs-algos-lib
 
-> Research program frozen 2026-07; this library is complete and maintained as-is. Entry point: [corrcalc-graphs-meta](https://github.com/tarvyn-analytics/corrcalc-graphs-meta).
+> Feature-complete and stable; maintained as-is.
 
-Pure-Java **graph-algorithms** library for the structural analysis of a graph
-built from a square **correlation** or **adjacency** matrix. It began as a
-transitive-orientation (comparability) analysis ported from the master's thesis
-*"Securities-market analysis using transitively orientable graphs"* (the C#
-prototype's `GraphParser` / `Graph_NonOriented` / `FactorGraphLevel` / `Node`) and
-has since grown a family of independent structural analyses — hence
-`graphs-algos-lib`:
+A pure-Java, zero-dependency **graph-algorithms** library for the structural
+analysis of a graph built from a square **correlation** or **adjacency**
+matrix. It bundles five independent analyses, each returning a plain immutable
+object you can inspect or serialize:
 
-- **Comparability** (transitive orientability) — the factor-graph (modular)
-  decomposition hierarchy and the number of distinct transitive orientations, or,
-  when the graph is not comparability, the obstructing **odd chordless cycle**
-  (an "odd hole") with the weakest correlation edge on it (the cheapest edge to
-  drop to break the obstruction). See [What it computes](#what-it-computes).
-- **Chordality / decomposability** — a perfect elimination ordering when the graph
-  is chordal, otherwise a witnessing hole and a greedy **chordal completion**.
-  See [Chordality / decomposability](#chordality--decomposability).
+- **Comparability** (transitive orientability) — verdict and obstruction via
+  **Golumbic's forcing relation (Γ)**, the factor-graph hierarchy and exact
+  orientation count via **canonical modular decomposition**; on failure, the
+  obstructing odd cycle with the weakest correlation edge on it (the cheapest
+  edge to drop).
+- **Chordality / decomposability** — **maximum-cardinality search**
+  (Tarjan–Yannakakis) yielding a perfect elimination ordering when the graph is
+  chordal, otherwise a witnessing hole and a greedy **chordal completion**.
 - **Decomposability repair** — weakest-link edge deletion down to a chordal
   (decomposable) graph.
-- **Structural balance** — signed-graph (Heider/Harary) balance, with an
-  odd-negative cycle as the conflict witness.
-- **Cross-estimator robustness** — the stable core and outlier-sensitive edges
-  across several correlation estimators of the same variables.
+- **Structural balance** — signed-graph (Heider/Harary) balance decided in
+  linear time by a signed BFS 2-colouring, with an odd-negative cycle as the
+  conflict witness.
+- **Cross-estimator robustness** — the stable edge core and the
+  outlier-sensitive edges across several correlation estimators of the same
+  variables (selectivity-matched top-K, Jaccard overlap).
 
-There is no GUI and there are **zero runtime dependencies**; every result is a
-plain immutable object you can inspect or serialize.
+Every graph-property engine is proven against an exhaustive brute-force oracle
+over all small graphs. There is no GUI and there are **zero runtime
+dependencies**.
 
 ## Quick start
 
-As a dependency (published to GitHub Packages, private — resolve via a PAT with
-`read:packages`, or `./mvnw -DskipTests install` from this checkout):
+As a dependency (published to GitHub Packages, which needs a GitHub token with
+`read:packages` to resolve — or run `./mvnw -DskipTests install` from this
+checkout):
 
 ```xml
 <dependency>
     <groupId>ch.tarvynanalytics.graphs</groupId>
     <artifactId>graphs-algos-lib</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -76,12 +77,12 @@ AnalysisResult r = ComparabilityAnalyzer.analyze(
         GraphInput.fromAdjacency(adjacency, new String[] {"AAPL", "MSFT", "KO", "PEP"}));
 ```
 
-## What it computes
+## Comparability: what it computes
 
 For a comparability graph the library returns the **substitution (modular)
-decomposition** as a list of levels. Level 0 is the input graph; each subsequent
-level is the *factor graph* of the previous one — every maximal stable set
-(module) collapses to a single vertex. Three module kinds are distinguished:
+decomposition** as a list of levels. Level 0 is the input graph; each
+subsequent level is the *factor graph* of the previous one — every maximal
+module collapses to a single vertex:
 
 | `ModuleType`      | meaning                                                            |
 |-------------------|--------------------------------------------------------------------|
@@ -90,27 +91,24 @@ level is the *factor graph* of the previous one — every maximal stable set
 | `MIN_STABLE`      | minimal module captured by a chordless chain (neither of the above)|
 | `SINGLETON`       | a module of one vertex                                             |
 
-The number of distinct transitive orientations is computed from the canonical
-**modular decomposition** tree — the product over its nodes of `k!` for a series
-(join) node with `k` children, `1` for a parallel (union) node and `2` for a
-prime node — the standard Gallai/Golumbic count, held as a `BigInteger` so it
-never overflows.
+The number of distinct transitive orientations is the standard Gallai/Golumbic
+count over the canonical modular decomposition tree — the product of `k!` for a
+series node with `k` children, `1` for a parallel node and `2` for a prime
+node — held as a `BigInteger` so it never overflows.
 
 When the graph is **not** a comparability graph, `failure()` returns the
 `FailureCycle`: an odd-length closed **forcing walk** that obstructs any
-transitive orientation, in original vertices. When the obstruction is an odd hole
-(e.g. C₅, C₇) it is exactly that hole; for a folded obstruction (e.g. the 3-sun)
-it is a closed walk that may revisit vertices — every consecutive pair is a real
-edge either way.
+transitive orientation, in original vertices. When the obstruction is an odd
+hole (e.g. C₅, C₇) it is exactly that hole; for a folded obstruction (e.g. the
+3-sun) it is a closed walk that may revisit vertices — every consecutive pair
+is a real edge either way.
 
-> **Scope of the test.** The verdict and obstruction are decided by **Golumbic's
-> forcing relation (Γ)** — the standard, *sound and complete* comparability test
-> (a graph is a comparability graph iff no implication class contains an edge and
-> its reverse). The orientation count comes from the canonical modular
-> decomposition. Correctness is cross-checked against a brute-force oracle over
-> every graph up to 5 vertices. (Earlier releases ported a thesis prototype that
-> was found to be unsound, incomplete and to under-count; see
-> `docs/theory-review.md`.)
+> **Scope.** The verdict and obstruction come from **Golumbic's forcing
+> relation (Γ)** — the standard, *sound and complete* comparability test (a
+> graph is a comparability graph iff no implication class contains an edge and
+> its reverse); the count comes from the canonical modular decomposition. Both
+> are cross-checked against a brute-force oracle over every graph up to 5
+> vertices.
 
 ## Chordality / decomposability
 
@@ -134,29 +132,26 @@ if (c.isChordal()) {
 }
 ```
 
-When the graph is **chordal**, `perfectEliminationOrder()` is a PEO and both the
-hole and the fill-in are empty. When it is **not**, `chordlessCycle()` is a
-witnessing hole, `fillInEdges()` is a greedy chordal completion and
-`perfectEliminationOrder()` is a PEO of that completion (input graph + fill-in).
+When the graph is not chordal, `chordlessCycle()` is a witnessing hole,
+`fillInEdges()` is a greedy chordal completion and `perfectEliminationOrder()`
+is a PEO of that completion (input graph + fill-in).
 
 > **Scope.** Detection is maximum-cardinality search (Tarjan–Yannakakis); on
 > failure a hole is recovered as the obstruction. The completion is the
-> elimination game with a minimum-degree heuristic — any elimination order yields
-> a chordal completion, the heuristic only keeps the fill-in small. **Minimum**
-> fill-in is NP-hard, so the completion is *not* guaranteed minimal. Verdict,
-> witness and completion are cross-checked against a brute-force oracle over every
-> graph up to six vertices.
+> elimination game with a minimum-degree heuristic — **minimum** fill-in is
+> NP-hard, so the completion is small but *not* guaranteed minimal. Verdict,
+> witness and completion are cross-checked against a brute-force oracle over
+> every graph up to six vertices.
 
-Note comparability and chordality are independent: `C₄` is comparability but not
-chordal, the `3-sun` is chordal but not comparability, `K₄` is both and `C₅` is
-neither.
+Note comparability and chordality are independent: `C₄` is comparability but
+not chordal, the `3-sun` is chordal but not comparability, `K₄` is both and
+`C₅` is neither.
 
 ### Weakest-link repair (`DecomposabilityDiagnostic`)
 
 `ChordalityView.fillInEdges()` repairs decomposability by *adding* edges. The
 complementary repair — *removing* the weakest links that frustrate it — is
-`DecomposabilityDiagnostic`, the decomposability-targeted form of the thesis
-"weakest-edge-first" idea:
+`DecomposabilityDiagnostic`:
 
 ```java
 DecomposabilityReport r = DecomposabilityDiagnostic.analyze(
@@ -178,10 +173,11 @@ guaranteed minimum) but always terminates and is a principled diagnostic.
 
 The analyses above ignore the *sign* of a correlation. `StructuralBalanceAnalyzer`
 keeps it and tests **structural balance** (Heider / Harary): a signed graph is
-balanced iff every cycle has an even number of negative edges — equivalently, iff
-its vertices split into two camps with positive edges *within* a camp and negative
-edges *between* them. For a correlation graph that means the names fall into two
-blocs that are internally positively correlated and mutually negatively correlated.
+balanced iff every cycle has an even number of negative edges — equivalently,
+iff its vertices split into two camps with positive edges *within* a camp and
+negative edges *between* them. For a correlation graph that means the names
+fall into two blocs that are internally positively correlated and mutually
+negatively correlated.
 
 ```java
 StructuralBalanceView b = StructuralBalanceAnalyzer.analyze(
@@ -202,15 +198,15 @@ negative edges. A graph built from a plain boolean adjacency carries no signs
 ## Cross-estimator robustness (stable core)
 
 The analyses above look at one matrix. `CrossEstimatorAnalyzer` looks across
-several — Pearson, Spearman, Kendall, partial — and reports **how robust the edge
-structure is to the choice of estimator**: which links every estimator agrees on
-(the stable, trustworthy "gold core") versus which are seen by only one (the
+several — Pearson, Spearman, Kendall, partial — and reports **how robust the
+edge structure is to the choice of estimator**: which links every estimator
+agrees on (the stable "gold core") versus which are seen by only one (the
 outlier-sensitive links).
 
 Marginal estimators live on different scales (Kendall's τ is systematically
-smaller than Pearson's r), so a single absolute threshold would not compare like
-with like. Estimators are matched on **selectivity** instead: each contributes its
-top-K strongest edges by magnitude.
+smaller than Pearson's r), so a single absolute threshold would not compare
+like with like. Estimators are matched on **selectivity** instead: each
+contributes its top-K strongest edges by magnitude.
 
 ```java
 import ch.tarvynanalytics.graphs.algos.CrossEstimatorAnalyzer;
@@ -230,14 +226,10 @@ r.uniqueTo(0);              // edges only pearson's top-K has (outlier-sensitive
 ```
 
 `CrossEstimatorReport` carries the estimator names, the pairwise Jaccard matrix
-and, in `edges()`, every edge that appears in at least one estimator's top-K as a
-`RobustEdge` annotated with its `support()` (how many estimators agree) and the
-estimator indices that contain it — from which `stableCore()` (full support),
-`uniqueEdges()` (support 1) and `uniqueTo(estimator)` are derived. Ties at the
-top-K cut are broken deterministically by endpoint, and `topK` is clamped to the
-number of vertex pairs. This is set algebra over the top-K edge sets, not a
-graph-property decision, so it has no brute-force oracle; it is pinned by
-hand-computed fixtures.
+and, in `edges()`, every edge in at least one estimator's top-K as a
+`RobustEdge` annotated with its `support()`. Ties at the top-K cut are broken
+deterministically by endpoint, and `topK` is clamped to the number of vertex
+pairs.
 
 ## Storing / exporting the result
 
@@ -258,12 +250,8 @@ result.failure().ifPresent(f ->
 ```
 
 Render DOT with Graphviz, e.g. `dot -Tsvg graph.dot -o graph.svg`. The JSON
-mirrors the model: `comparability`, `transitiveOrientationCount` (a bare
-arbitrary-precision integer), `inputGraph`, `levels[]` (each with `graph`,
-`modules`, `factorGraph`), `failure` (`null`, or the cycle with its
-`weakestCorrelation` / `weakestEdge`; a non-finite correlation is `null`) and
-`chordality` (`chordal`, `perfectEliminationOrder`, `chordlessCycle`,
-`fillInEdges`).
+mirrors the result model (`comparability`, `transitiveOrientationCount`,
+`inputGraph`, `levels[]`, `failure`, `chordality`).
 
 ## Batch analysis (threshold sweeps, parallel)
 
@@ -275,7 +263,7 @@ parallel over the common `ForkJoinPool`:
 ```java
 import ch.tarvynanalytics.graphs.algos.BatchAnalyzer;
 
-// the thesis workflow: analyse one correlation matrix across rising thresholds
+// analyse one correlation matrix across rising thresholds
 double[] thresholds = {0.3, 0.4, 0.5, 0.6, 0.7};
 List<AnalysisResult> sweep = BatchAnalyzer.thresholdSweepParallel(correlation, thresholds);
 
@@ -291,7 +279,9 @@ unmodifiable.
 
 The jar is runnable — point it at a correlation-matrix CSV and it prints the
 verdict. The CSV is an optional header row of labels followed by one row of `n`
-comma-separated values per vertex (the corrcalc exports are exactly this shape):
+comma-separated values per vertex (the
+[corrcalc-lib](https://github.com/tarvyn-analytics/corrcalc-lib) exports are
+exactly this shape):
 
 ```
 AAPL,MSFT,SPY,GLD,TLT
@@ -301,7 +291,7 @@ AAPL,MSFT,SPY,GLD,TLT
 
 ```bash
 ./mvnw -q package -DskipTests
-java -jar target/graphs-algos-lib-0.1.0-SNAPSHOT.jar matrix.csv --threshold 0.5
+java -jar target/graphs-algos-lib-*.jar matrix.csv --threshold 0.5
 ```
 
 ```
@@ -315,24 +305,20 @@ decomposition levels:    4
 chordal:       YES (decomposable)
 ```
 
-When the graph is not chordal the CLI prints `chordal: NO` instead, with the
-chordless cycle and the number of fill-in edges its chordal completion adds.
-
 An edge is created for every pair with `|correlation| > |threshold|`
 (`--threshold` / `-t`, default `0.5`). `--json` emits the result as JSON (the
 `JsonExporter` shape); `--repair` switches to the decomposability diagnostic —
-the weakest links to remove to make the graph chordal (with `--json`, the
-`DecomposabilityReport` JSON); `--balance` switches to the signed-graph
-structural-balance verdict (the two correlation blocs, or a frustrated cycle);
-`--help` shows usage. Exit codes are **result-only**: `0` when the analysis ran
-(whatever the verdict), `2` for a usage error, `1` for an input/IO error — read
-the verdict from the output, not the exit code.
+the weakest links to remove to make the graph chordal; `--balance` switches to
+the signed-graph structural-balance verdict (the two correlation blocs, or a
+frustrated cycle); `--help` shows usage. Exit codes are **result-only**: `0`
+when the analysis ran (whatever the verdict), `2` for a usage error, `1` for an
+input/IO error — read the verdict from the output, not the exit code.
 
-To compare several estimators, pass `--robust` and two or more CSVs over the same
-variables (the estimator name is each file's stem):
+To compare several estimators, pass `--robust` and two or more CSVs over the
+same variables (the estimator name is each file's stem):
 
 ```bash
-java -jar target/graphs-algos-lib-0.1.0-SNAPSHOT.jar --robust \
+java -jar target/graphs-algos-lib-*.jar --robust \
     pearson.csv spearman.csv kendall.csv partial.csv --top 144
 ```
 
@@ -350,39 +336,8 @@ estimator-unique edges (outlier-sensitive):
 ```
 
 `--top <k>` is the per-estimator selectivity; it defaults to the first
-estimator's edge count above `--threshold` (so `--robust ... --threshold 0.8`
-matches the K to Pearson's 0.8 graph). With `--json` it emits the
+estimator's edge count above `--threshold`. With `--json` it emits the
 `CrossEstimatorReport` shape.
-
-## Package layout
-
-```
-ch.tarvynanalytics.graphs.algos
-  ComparabilityAnalyzer   – entry point: analyze(GraphInput) -> AnalysisResult
-  BatchAnalyzer           – run many analyses / threshold sweeps, optionally parallel
-  DecomposabilityDiagnostic – weakest-link repair to a chordal (decomposable) graph
-  StructuralBalanceAnalyzer – signed-graph structural balance (Heider/Harary)
-  CrossEstimatorAnalyzer  – cross-estimator robustness / stable core (top-K Jaccard)
-  GraphInput              – build the graph from a correlation or adjacency matrix
-  EstimatorMatrix         – a named correlation matrix (input to CrossEstimatorAnalyzer)
-  (package-private)       – ForcingRelation (Golumbic Γ verdict + obstruction),
-                            ModularDecomposition (count + factor-graph levels),
-                            Chordality (chordality verdict + PEO / hole / completion),
-                            StructuralBalance (signed BFS 2-colouring),
-                            ResultBuilder: the engine; not exported
-  .cli                    – ComparabilityCli (java -jar entry point over a CSV;
-                            package-private CorrelationCsv reader)
-  .model                  – immutable result types (records):
-                            AnalysisResult, GraphView, NodeView, EdgeView,
-                            FactorGraphLevelView, ModuleView, ModuleType,
-                            FailureCycle, ChordalityView, DecomposabilityReport,
-                            StructuralBalanceView, CrossEstimatorReport, RobustEdge
-  .export                 – JsonExporter, DotExporter (zero-dependency serializers)
-  .exception              – ComparabilityException, InvalidInputException
-```
-
-Only interfaces/entry points, the input builder, the model and the exceptions
-are public; the engine classes are package-private.
 
 ## Build
 
@@ -390,19 +345,18 @@ Requires JDK 21+. Uses the Maven wrapper.
 
 ```bash
 ./mvnw clean verify      # tests + JaCoCo coverage gates (80% line / 70% branch)
-./mvnw test              # tests only
 ./mvnw test -Dtest=ComparabilityAnalyzerTest
 ```
 
-This is primarily a library and the tests are its executable spec; it also ships
-a small command-line interface (see above) for analysing a correlation-matrix CSV
-directly. The published artifact (jar + sources + javadoc) goes to GitHub Packages
-under `ch.tarvynanalytics.graphs:graphs-algos-lib`.
+This is primarily a library and the tests are its executable spec — every
+graph-property verdict is proven against known graph theory and exhaustive
+small-graph oracles, never against the code's own output. The published
+artifact (jar + sources + javadoc) goes to GitHub Packages under
+`ch.tarvynanalytics.graphs:graphs-algos-lib`. Only the entry points, the input
+builders, the result model and the exceptions are public; the engine classes
+are package-private. CI validates every PR (build, tests, coverage, SonarCloud
+quality gate); working rules live in [CLAUDE.md](CLAUDE.md).
 
-## Development
+## License
 
-GitFlow: `feature/GAL-<n>-eb-<desc>` → squash-merge to `develop`; releases merge
-`develop` → `main`. CI validates every PR (build, tests, coverage, SonarCloud
-quality gate) and publishes on push. See `CLAUDE.md` for the working rules and
-`.claude/skills/` for the Jira and release helpers. Work is tracked in Jira
-project **GAL** (Graph Algos Lib).
+Licensed under the [Apache License, Version 2.0](LICENSE).
