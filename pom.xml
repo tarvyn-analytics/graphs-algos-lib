@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.tarvyn-analytics.graphs</groupId>
     <artifactId>graphs-algos-lib</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>graphs algos lib</name>
     <description>Pure Java graph-algorithms library over a thresholded correlation/adjacency
