@@ -22,13 +22,16 @@ import java.util.List;
  *                                  (every variable is a node, including zero-edge isolates)
  * @param largestComponentFraction  {@code |largest component| / m} ({@link Double#NaN} when {@code m == 0})
  * @param componentSizes            component sizes at {@code C_t}, descending, summing to {@code m}
+ * @param definedPairCount          {@code |V|}, the number of pairs finite in both matrices; {@code -1} via
+ *                                  the legacy 6-arg constructor, where it is not known
  */
 public record ChangeMetrics(double weightedChange,
                             double densityLevel,
                             double edgeXor,
                             int nComponents,
                             double largestComponentFraction,
-                            List<Integer> componentSizes) {
+                            List<Integer> componentSizes,
+                            int definedPairCount) {
 
     /**
      * Canonical constructor; defensively copies {@code componentSizes}.
@@ -39,8 +42,15 @@ public record ChangeMetrics(double weightedChange,
      * @param nComponents              the number of connected components
      * @param largestComponentFraction the largest component's fraction of all variables
      * @param componentSizes           the component sizes, descending
+     * @param definedPairCount         the intersection valid-pair count {@code |V|}
      */
     public ChangeMetrics {
         componentSizes = List.copyOf(componentSizes);
+    }
+
+    /** Pre-{@code definedPairCount} arity; delegates with {@code -1} (not known). */
+    public ChangeMetrics(double weightedChange, double densityLevel, double edgeXor, int nComponents,
+            double largestComponentFraction, List<Integer> componentSizes) {
+        this(weightedChange, densityLevel, edgeXor, nComponents, largestComponentFraction, componentSizes, -1);
     }
 }

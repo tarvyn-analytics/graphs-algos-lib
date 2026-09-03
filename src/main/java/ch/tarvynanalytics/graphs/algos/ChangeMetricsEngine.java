@@ -80,7 +80,8 @@ final class ChangeMetricsEngine {
         ClusterResult cluster = clusterSignal(m, densityEdge);
 
         return new ChangeMetrics(weightedChange, densityLevel, edgeXor,
-                cluster.nComponents, cluster.largestComponentFraction, cluster.componentSizes);
+                cluster.nComponents, cluster.largestComponentFraction, cluster.componentSizes,
+                (int) validPairCount);
     }
 
     /**
