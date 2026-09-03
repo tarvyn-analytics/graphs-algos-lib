@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The {@link ChangeSignal} record: accessors, the derived {@link ChangeSignal#fired()}, and guards. */
 class ChangeSignalTest {
 
+    @SuppressWarnings("deprecation")   // exercises the legacy 6-arg constructor deliberately
     private static ChangeMetrics metrics() {
         return new ChangeMetrics(0.04, 0.7, 0.1, 2, 0.6, List.of(3, 2));
     }
@@ -53,5 +54,12 @@ class ChangeSignalTest {
     void constructor_NullFireDirection_Throws() {
         assertThrows(IllegalArgumentException.class,
                 () -> new ChangeSignal(0L, metrics(), 0.0, 0.0, 0.0, null));
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void changeMetrics_LegacySixArgConstructor_DefinedPairCountIsNegativeOneSentinel() {
+        ChangeMetrics m = new ChangeMetrics(0.04, 0.7, 0.1, 2, 0.6, List.of(3, 2));
+        assertEquals(-1, m.definedPairCount());
     }
 }

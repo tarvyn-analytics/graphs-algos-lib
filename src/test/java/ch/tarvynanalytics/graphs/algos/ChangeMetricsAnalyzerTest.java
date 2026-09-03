@@ -387,6 +387,7 @@ class ChangeMetricsAnalyzerTest {
                                     assertEquals(expected, m.weightedChange(), 1e-12);
                                 }
                                 assertEquals(referenceDefinedPairCount(prev, curr), m.definedPairCount());
+                                assertTrue(m.definedPairCount() >= 0, "engine-computed count is never negative");
                             }
                         }
                     }

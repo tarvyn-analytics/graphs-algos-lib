@@ -48,7 +48,14 @@ public record ChangeMetrics(double weightedChange,
         componentSizes = List.copyOf(componentSizes);
     }
 
-    /** Pre-{@code definedPairCount} arity; delegates with {@code -1} (not known). */
+    /**
+     * Pre-{@code definedPairCount} arity; delegates with {@code -1} (not known) — this silently
+     * drops the count on any rebuild from an existing instance, use the 7-arg canonical form.
+     *
+     * @deprecated since 1.1.0; loses {@code definedPairCount} — carry {@link #definedPairCount()}
+     *             through the 7-arg canonical constructor instead
+     */
+    @Deprecated(since = "1.1.0")
     public ChangeMetrics(double weightedChange, double densityLevel, double edgeXor, int nComponents,
             double largestComponentFraction, List<Integer> componentSizes) {
         this(weightedChange, densityLevel, edgeXor, nComponents, largestComponentFraction, componentSizes, -1);
