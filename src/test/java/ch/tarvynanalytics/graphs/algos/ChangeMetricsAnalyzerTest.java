@@ -133,6 +133,81 @@ class ChangeMetricsAnalyzerTest {
         assertEquals(List.of(), m.componentSizes());
     }
 
+    // ---- definedPairCount: |V|, pairs finite in both matrices (GAL-38) ----
+
+    @Test
+    void definedPairCount_HandComputedThreeByThree_MatchesIntersectionValidPairCount() {
+        ChangeMetrics m = ChangeMetricsAnalyzer.analyze(C_A, C_B, 0.5);
+        assertEquals(3, m.definedPairCount());
+    }
+
+    @Test
+    void definedPairCount_BothOneSideAndNoSideFinite_CountsOnlyPairsFiniteInBoth() {
+        // pair (0,1): finite in both -> counts. (0,2): finite in prev, NaN in cur -> one-side, excluded.
+        // (1,2): NaN in both -> none finite, excluded. Expected |V| = 1.
+        double[][] prev = {
+                {1.00, 0.10, 0.20},
+                {0.10, 1.00, Double.NaN},
+                {0.20, Double.NaN, 1.00}
+        };
+        double[][] cur = {
+                {1.00, 0.50, Double.NaN},
+                {0.50, 1.00, Double.NaN},
+                {Double.NaN, Double.NaN, 1.00}
+        };
+        ChangeMetrics m = ChangeMetricsAnalyzer.analyze(prev, cur, 0.5);
+        assertEquals(1, m.definedPairCount());
+    }
+
+    @Test
+    void definedPairCount_AllPairsInvalidInOneWindow_IsZero() {
+        double[][] allNaN = {
+                {1.00, Double.NaN, Double.NaN},
+                {Double.NaN, 1.00, Double.NaN},
+                {Double.NaN, Double.NaN, 1.00}
+        };
+        ChangeMetrics m = ChangeMetricsAnalyzer.analyze(allNaN, C_B, 0.5);
+        assertEquals(0, m.definedPairCount());
+    }
+
+    @Test
+    void definedPairCount_AllPairsInvalidInBothWindows_IsZero() {
+        double[][] allNaN = {
+                {1.00, Double.NaN, Double.NaN},
+                {Double.NaN, 1.00, Double.NaN},
+                {Double.NaN, Double.NaN, 1.00}
+        };
+        ChangeMetrics m = ChangeMetricsAnalyzer.analyze(allNaN, allNaN, 0.5);
+        assertEquals(0, m.definedPairCount());
+    }
+
+    @Test
+    void definedPairCount_OrderTwoBothFinite_IsOne() {
+        double[][] prev = identity(2);
+        double[][] cur = identity(2);
+        prev[0][1] = prev[1][0] = 0.1;
+        cur[0][1] = cur[1][0] = 0.6;
+        ChangeMetrics m = ChangeMetricsAnalyzer.analyze(prev, cur, 0.5);
+        assertEquals(1, m.definedPairCount());
+    }
+
+    @Test
+    void definedPairCount_OrderTwoOneSideNaN_IsZero() {
+        double[][] prev = identity(2);
+        double[][] cur = identity(2);
+        prev[0][1] = prev[1][0] = 0.1;
+        cur[0][1] = cur[1][0] = Double.NaN;
+        ChangeMetrics m = ChangeMetricsAnalyzer.analyze(prev, cur, 0.5);
+        assertEquals(0, m.definedPairCount());
+    }
+
+    @Test
+    void definedPairCount_DegenerateZeroOrder_IsZero() {
+        double[][] empty = new double[0][0];
+        ChangeMetrics m = ChangeMetricsAnalyzer.analyze(empty, empty, 0.5);
+        assertEquals(0, m.definedPairCount());
+    }
+
     // ---- cluster signal: replay_cluster_signal.py smoke values, ported verbatim ----
 
     @Test
@@ -311,6 +386,8 @@ class ChangeMetricsAnalyzerTest {
                                 } else {
                                     assertEquals(expected, m.weightedChange(), 1e-12);
                                 }
+                                assertEquals(referenceDefinedPairCount(prev, curr), m.definedPairCount());
+                                assertTrue(m.definedPairCount() >= 0, "engine-computed count is never negative");
                             }
                         }
                     }
@@ -341,6 +418,20 @@ class ChangeMetricsAnalyzerTest {
             }
         }
         return count == 0 ? Double.NaN : sum / count;
+    }
+
+    /** Independent double-loop re-implementation of {@code |V|}, structurally independent of the engine. */
+    private static int referenceDefinedPairCount(double[][] prev, double[][] curr) {
+        int m = curr.length;
+        int count = 0;
+        for (int i = 0; i < m; i++) {
+            for (int j = i + 1; j < m; j++) {
+                if (Double.isFinite(prev[i][j]) && Double.isFinite(curr[i][j])) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     private static double[][] matrixOf(double r01, double r02, double r12) {
